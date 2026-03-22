@@ -21,12 +21,12 @@ type FirebaseConfig = {
 }
 
 const firebaseEnvMap = {
-  VITE_FIREBASE_API_KEY: import.meta.env.VITE_FIREBASE_API_KEY ?? '',
-  VITE_FIREBASE_AUTH_DOMAIN: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? '',
-  VITE_FIREBASE_PROJECT_ID: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? '',
-  VITE_FIREBASE_STORAGE_BUCKET: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? '',
-  VITE_FIREBASE_MESSAGING_SENDER_ID: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? '',
-  VITE_FIREBASE_APP_ID: import.meta.env.VITE_FIREBASE_APP_ID ?? '',
+  VITE_FIREBASE_API_KEY: 'AIzaSyAYSXsijQgzFIRnCyBRF26JtHTh-mYtFbs',
+  VITE_FIREBASE_AUTH_DOMAIN: 'map-b8e70.firebaseapp.com',
+  VITE_FIREBASE_PROJECT_ID: 'map-b8e70',
+  VITE_FIREBASE_STORAGE_BUCKET: 'map-b8e70.firebasestorage.app',
+  VITE_FIREBASE_MESSAGING_SENDER_ID: '711874835896',
+  VITE_FIREBASE_APP_ID: '1:711874835896:web:ccff17ef84d7f33a514b4d',
 } as const
 
 const firebaseConfig: FirebaseConfig = {

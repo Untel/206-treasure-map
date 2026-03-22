@@ -8,6 +8,8 @@ import {
 } from '../types/map'
 
 const SUGGESTION_STEP = 5
+const TOP_SUGGESTION_COUNT = 5
+const SUGGESTION_SEPARATION_DISTANCE = ZONE_SIZE * 2
 const MIN_X = ZONE_RADIUS
 const MAX_X = MAP_WIDTH - ZONE_RADIUS
 const MIN_Y = ZONE_RADIUS
@@ -57,7 +59,7 @@ export function isPlacementValid(
   return positions.every((position) => !zonesOverlap(candidate, position))
 }
 
-function nearestDistance(
+function nearestPositionDistance(
   candidate: Pick<PositionRecord, 'x' | 'y'>,
   positions: Array<Pick<PositionRecord, 'x' | 'y'>>,
 ) {
@@ -70,6 +72,31 @@ function nearestDistance(
       Math.hypot(candidate.x - position.x, candidate.y - position.y),
     ),
   )
+}
+
+function borderDistance(candidate: Pick<PositionRecord, 'x' | 'y'>) {
+  const bounds = zoneBounds(candidate.x, candidate.y)
+
+  return Math.min(
+    bounds.left,
+    bounds.top,
+    MAP_WIDTH - bounds.right,
+    MAP_HEIGHT - bounds.bottom,
+  )
+}
+
+function nearestConstraintDistance(
+  candidate: Pick<PositionRecord, 'x' | 'y'>,
+  positions: Array<Pick<PositionRecord, 'x' | 'y'>>,
+) {
+  return Math.min(nearestPositionDistance(candidate, positions), borderDistance(candidate))
+}
+
+function candidateDistance(
+  first: Pick<PositionRecord, 'x' | 'y'>,
+  second: Pick<PositionRecord, 'x' | 'y'>,
+) {
+  return Math.hypot(first.x - second.x, first.y - second.y)
 }
 
 function centerBias(candidate: Pick<PositionRecord, 'x' | 'y'>) {
@@ -96,7 +123,7 @@ export function suggestNextZone(positions: PositionRecord[]): SuggestedZone | nu
     [0, 1],
     [0, -1],
   ] as const
-  let best: SuggestedZone | null = null
+  const candidates: SuggestedZone[] = []
 
   for (let row = 0; row < rows; row += 1) {
     for (let column = 0; column < columns; column += 1) {
@@ -139,22 +166,48 @@ export function suggestNextZone(positions: PositionRecord[]): SuggestedZone | nu
           x: MIN_X + componentColumn * SUGGESTION_STEP,
           y: MIN_Y + componentRow * SUGGESTION_STEP,
         }
-        const clearance = nearestDistance(candidate, positions)
+        const clearance = nearestConstraintDistance(candidate, positions)
         const score = componentArea + clearance * 2 - centerBias(candidate) * 0.03
 
-        if (
-          !best ||
-          score > best.score ||
-          (score === best.score && componentArea > best.area) ||
-          (score === best.score && componentArea === best.area && clearance > best.clearance)
-        ) {
-          best = { ...candidate, score, clearance, area: componentArea }
-        }
+        candidates.push({ ...candidate, score, clearance, area: componentArea })
       }
     }
   }
 
-  return best
+  if (candidates.length === 0) {
+    return null
+  }
+
+  candidates.sort((left, right) => {
+    if (right.score !== left.score) {
+      return right.score - left.score
+    }
+
+    if (right.area !== left.area) {
+      return right.area - left.area
+    }
+
+    return right.clearance - left.clearance
+  })
+
+  const topZones: SuggestedZone[] = []
+
+  for (const candidate of candidates) {
+    const isDistinct = topZones.every(
+      (selected) => candidateDistance(candidate, selected) >= SUGGESTION_SEPARATION_DISTANCE,
+    )
+
+    if (isDistinct) {
+      topZones.push(candidate)
+    }
+
+    if (topZones.length === TOP_SUGGESTION_COUNT) {
+      break
+    }
+  }
+
+  const pool = topZones.length > 0 ? topZones : candidates.slice(0, TOP_SUGGESTION_COUNT)
+  return pool[Math.floor(Math.random() * pool.length)] ?? null
 }
 
 export function coveragePercentage(positions: PositionRecord[]) {

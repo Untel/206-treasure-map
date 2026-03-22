@@ -1,4 +1,5 @@
-export const MAP_SIZE = 1000
+export const MAP_WIDTH = 509
+export const MAP_HEIGHT = 1021
 export const ZONE_SIZE = 25
 export const ZONE_HALF_SIZE = ZONE_SIZE / 2
 

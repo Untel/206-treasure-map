@@ -1,5 +1,6 @@
 import {
-  MAP_SIZE,
+  MAP_HEIGHT,
+  MAP_WIDTH,
   ZONE_HALF_SIZE,
   ZONE_SIZE,
   type PositionRecord,
@@ -8,10 +9,15 @@ import {
 
 const SUGGESTION_STEP = 5
 const SUGGESTION_PADDING = ZONE_HALF_SIZE
-const CENTER = MAP_SIZE / 2
+const CENTER_X = MAP_WIDTH / 2
+const CENTER_Y = MAP_HEIGHT / 2
 
-export function clampCoordinate(value: number) {
-  return Math.min(MAP_SIZE - SUGGESTION_PADDING, Math.max(SUGGESTION_PADDING, value))
+export function clampXCoordinate(value: number) {
+  return Math.min(MAP_WIDTH - SUGGESTION_PADDING, Math.max(SUGGESTION_PADDING, value))
+}
+
+export function clampYCoordinate(value: number) {
+  return Math.min(MAP_HEIGHT - SUGGESTION_PADDING, Math.max(SUGGESTION_PADDING, value))
 }
 
 export function zoneBounds(x: number, y: number) {
@@ -38,8 +44,8 @@ export function isPlacementValid(
   const inBounds =
     bounds.left >= 0 &&
     bounds.top >= 0 &&
-    bounds.right <= MAP_SIZE &&
-    bounds.bottom <= MAP_SIZE
+    bounds.right <= MAP_WIDTH &&
+    bounds.bottom <= MAP_HEIGHT
 
   if (!inBounds) {
     return false
@@ -53,7 +59,7 @@ function nearestDistance(
   positions: Array<Pick<PositionRecord, 'x' | 'y'>>,
 ) {
   if (positions.length === 0) {
-    return MAP_SIZE
+    return Math.hypot(MAP_WIDTH, MAP_HEIGHT)
   }
 
   return Math.min(
@@ -64,16 +70,20 @@ function nearestDistance(
 }
 
 function centerBias(candidate: Pick<PositionRecord, 'x' | 'y'>) {
-  return Math.hypot(candidate.x - CENTER, candidate.y - CENTER)
+  return Math.hypot(candidate.x - CENTER_X, candidate.y - CENTER_Y)
 }
 
 export function suggestNextZone(positions: PositionRecord[]): SuggestedZone | null {
   let best: SuggestedZone | null = null
 
-  for (let y = SUGGESTION_PADDING; y <= MAP_SIZE - SUGGESTION_PADDING; y += SUGGESTION_STEP) {
+  for (
+    let y = SUGGESTION_PADDING;
+    y <= MAP_HEIGHT - SUGGESTION_PADDING;
+    y += SUGGESTION_STEP
+  ) {
     for (
       let x = SUGGESTION_PADDING;
-      x <= MAP_SIZE - SUGGESTION_PADDING;
+      x <= MAP_WIDTH - SUGGESTION_PADDING;
       x += SUGGESTION_STEP
     ) {
       const candidate = { x, y }
@@ -99,5 +109,5 @@ export function suggestNextZone(positions: PositionRecord[]): SuggestedZone | nu
 
 export function coveragePercentage(positions: PositionRecord[]) {
   const coveredArea = positions.length * ZONE_SIZE * ZONE_SIZE
-  return Math.min(100, (coveredArea / (MAP_SIZE * MAP_SIZE)) * 100)
+  return Math.min(100, (coveredArea / (MAP_WIDTH * MAP_HEIGHT)) * 100)
 }

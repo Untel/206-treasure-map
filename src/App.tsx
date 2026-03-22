@@ -2,10 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { MapCanvas } from './components/MapCanvas'
 import { isFirebaseReady, savePosition, subscribeToPositions } from './lib/firebase'
 import { ITEM_OPTIONS } from './lib/items'
-import { clampCoordinate, coveragePercentage, isPlacementValid, suggestNextZone } from './lib/map'
-import { MAP_SIZE, type PositionDraft, type PositionRecord } from './types/map'
+import {
+  clampXCoordinate,
+  clampYCoordinate,
+  coveragePercentage,
+  isPlacementValid,
+  suggestNextZone,
+} from './lib/map'
+import { MAP_HEIGHT, MAP_WIDTH, type PositionDraft, type PositionRecord } from './types/map'
 
-const initialPoint = { x: MAP_SIZE / 2, y: MAP_SIZE / 2 }
+const initialPoint = { x: MAP_WIDTH / 2, y: MAP_HEIGHT / 2 }
 
 function App() {
   const [positions, setPositions] = useState<PositionRecord[]>([])
@@ -25,8 +31,8 @@ function App() {
   const coverage = useMemo(() => coveragePercentage(positions), [positions])
 
   const candidate: PositionDraft = {
-    x: Math.round(clampCoordinate(selectedPoint.x) * 10) / 10,
-    y: Math.round(clampCoordinate(selectedPoint.y) * 10) / 10,
+    x: Math.round(clampXCoordinate(selectedPoint.x) * 10) / 10,
+    y: Math.round(clampYCoordinate(selectedPoint.y) * 10) / 10,
     status,
     item: status === 'found' ? item : null,
     note: note.trim(),
@@ -59,7 +65,7 @@ function App() {
     <main className="app-shell">
       <section className="hero-panel">
         <div>
-          <p className="eyebrow">1000 x 1000 research board</p>
+          <p className="eyebrow">509 x 1021 research board</p>
           <h1>Map coverage tracker</h1>
           <p className="hero-copy">
             Register found objects and empty runs, block the 25x25 zone around each record, and
@@ -115,7 +121,7 @@ function App() {
             </span>
             <span className="legend-item">
               <i className="swatch swatch-empty" />
-              Nothing found
+              Scrap
             </span>
             <span className="legend-item">
               <i className="swatch swatch-suggested" />
@@ -139,7 +145,7 @@ function App() {
                 <input
                   type="number"
                   min={0}
-                  max={MAP_SIZE}
+                  max={MAP_WIDTH}
                   step={0.5}
                   value={candidate.x}
                   onChange={(event) =>
@@ -156,7 +162,7 @@ function App() {
                 <input
                   type="number"
                   min={0}
-                  max={MAP_SIZE}
+                  max={MAP_HEIGHT}
                   step={0.5}
                   value={candidate.y}
                   onChange={(event) =>
@@ -256,13 +262,13 @@ function App() {
                 positions.map((position) => (
                   <article className="history-item" key={position.id}>
                     <div>
-                      <strong>{position.item ?? 'Nothing found'}</strong>
+                      <strong>{position.item ?? 'Scrap'}</strong>
                       <p>
                         {position.x}, {position.y}
                       </p>
                     </div>
                     <span className={position.status === 'found' ? 'pill found' : 'pill empty'}>
-                      {position.status === 'found' ? 'Found' : 'Empty'}
+                      {position.status === 'found' ? 'Found' : 'Scrap'}
                     </span>
                   </article>
                 ))

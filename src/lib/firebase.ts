@@ -47,7 +47,12 @@ function mapDocToPosition(
     id,
     x: Number(data.x ?? 0),
     y: Number(data.y ?? 0),
-    status: data.status === 'found' ? 'found' : 'empty',
+    status:
+      data.status === 'found'
+        ? 'found'
+        : data.status === 'nothing'
+          ? 'nothing'
+          : 'scrap',
     item: typeof data.item === 'string' && data.item.length > 0 ? data.item : null,
     note: typeof data.note === 'string' ? data.note : '',
     createdAt: timestamp,

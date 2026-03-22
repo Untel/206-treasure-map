@@ -1,9 +1,9 @@
 export const MAP_WIDTH = 509
 export const MAP_HEIGHT = 1021
 export const ZONE_SIZE = 25
-export const ZONE_HALF_SIZE = ZONE_SIZE / 2
+export const ZONE_RADIUS = Math.floor(ZONE_SIZE / 2)
 
-export type PositionStatus = 'found' | 'empty'
+export type PositionStatus = 'found' | 'scrap' | 'nothing'
 
 export type PositionRecord = {
   id: string

@@ -17,8 +17,10 @@ const initialPoint = { x: MAP_WIDTH / 2, y: MAP_HEIGHT / 2 }
 function App() {
   const [positions, setPositions] = useState<PositionRecord[]>([])
   const [selectedPoint, setSelectedPoint] = useState(initialPoint)
+  const [xInput, setXInput] = useState(String(initialPoint.x))
+  const [yInput, setYInput] = useState(String(initialPoint.y))
   const [locale, setLocale] = useState<Locale>('en')
-  const [status, setStatus] = useState<'found' | 'empty'>('found')
+  const [status, setStatus] = useState<'found' | 'scrap' | 'nothing'>('found')
   const [item, setItem] = useState('')
   const [note, setNote] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -38,7 +40,7 @@ function App() {
   const itemOptions = useMemo(() => availableItems(foundItems), [foundItems])
 
   useEffect(() => {
-    if (status === 'empty') {
+    if (status !== 'found') {
       return
     }
 
@@ -47,9 +49,14 @@ function App() {
     }
   }, [item, itemOptions, status])
 
+  useEffect(() => {
+    setXInput(String(selectedPoint.x))
+    setYInput(String(selectedPoint.y))
+  }, [selectedPoint.x, selectedPoint.y])
+
   const candidate: PositionDraft = {
-    x: Math.round(clampXCoordinate(selectedPoint.x) * 10) / 10,
-    y: Math.round(clampYCoordinate(selectedPoint.y) * 10) / 10,
+    x: clampXCoordinate(selectedPoint.x),
+    y: clampYCoordinate(selectedPoint.y),
     status,
     item: status === 'found' ? item || null : null,
     note: note.trim(),
@@ -59,6 +66,10 @@ function App() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    setSelectedPoint({
+      x: clampXCoordinate(selectedPoint.x),
+      y: clampYCoordinate(selectedPoint.y),
+    })
     if (!candidateIsValid) {
       setError(t(locale, 'overlapError'))
       return
@@ -80,6 +91,18 @@ function App() {
 
   return (
     <main className="app-shell">
+      <section className="tutorial-panel">
+        <div className="tutorial-mark">?</div>
+        <div>
+          <p className="eyebrow">{t(locale, 'tutorialTitle')}</p>
+          <p className="tutorial-copy">{t(locale, 'tutorialStep')}</p>
+        </div>
+        <div className="history-demo">
+          <span className="history-icon">?</span>
+          <span>{t(locale, 'tutorialWarning')}</span>
+        </div>
+      </section>
+
       <section className="hero-panel">
         <div>
           <p className="eyebrow">{t(locale, 'appTagline')}</p>
@@ -149,8 +172,12 @@ function App() {
               {t(locale, 'foundObject')}
             </span>
             <span className="legend-item">
-              <i className="swatch swatch-empty" />
+              <i className="swatch swatch-scrap" />
               {t(locale, 'scrap')}
+            </span>
+            <span className="legend-item">
+              <i className="swatch swatch-empty" />
+              {t(locale, 'nothingFound')}
             </span>
             <span className="legend-item">
               <i className="swatch swatch-suggested" />
@@ -175,14 +202,30 @@ function App() {
                   type="number"
                   min={0}
                   max={MAP_WIDTH}
-                  step={0.5}
-                  value={candidate.x}
-                  onChange={(event) =>
+                  step={1}
+                  value={xInput}
+                  onChange={(event) => {
+                    setXInput(event.target.value)
+                    if (event.target.value === '') {
+                      return
+                    }
+
+                    const next = Number(event.target.value)
+                    if (Number.isFinite(next)) {
+                      setSelectedPoint((current) => ({
+                        ...current,
+                        x: next,
+                      }))
+                    }
+                  }}
+                  onBlur={() => {
+                    const next = clampXCoordinate(xInput === '' ? selectedPoint.x : Number(xInput))
                     setSelectedPoint((current) => ({
                       ...current,
-                      x: Number(event.target.value),
+                      x: next,
                     }))
-                  }
+                    setXInput(String(next))
+                  }}
                 />
               </label>
 
@@ -192,14 +235,30 @@ function App() {
                   type="number"
                   min={0}
                   max={MAP_HEIGHT}
-                  step={0.5}
-                  value={candidate.y}
-                  onChange={(event) =>
+                  step={1}
+                  value={yInput}
+                  onChange={(event) => {
+                    setYInput(event.target.value)
+                    if (event.target.value === '') {
+                      return
+                    }
+
+                    const next = Number(event.target.value)
+                    if (Number.isFinite(next)) {
+                      setSelectedPoint((current) => ({
+                        ...current,
+                        y: next,
+                      }))
+                    }
+                  }}
+                  onBlur={() => {
+                    const next = clampYCoordinate(yInput === '' ? selectedPoint.y : Number(yInput))
                     setSelectedPoint((current) => ({
                       ...current,
-                      y: Number(event.target.value),
+                      y: next,
                     }))
-                  }
+                    setYInput(String(next))
+                  }}
                 />
               </label>
 
@@ -207,26 +266,34 @@ function App() {
                 {t(locale, 'result')}
                 <select
                   value={status}
-                  onChange={(event) => setStatus(event.target.value as 'found' | 'empty')}
+                  onChange={(event) => setStatus(event.target.value as 'found' | 'scrap' | 'nothing')}
                 >
                   <option value="found">{t(locale, 'foundObject')}</option>
-                  <option value="empty">{t(locale, 'scrap')}</option>
+                  <option value="scrap">{t(locale, 'scrap')}</option>
+                  <option value="nothing">{t(locale, 'nothingFound')}</option>
                 </select>
               </label>
 
               <label>
                 {t(locale, 'item')}
-                <select
-                  value={item}
-                  onChange={(event) => setItem(event.target.value)}
-                  disabled={status === 'empty' || itemOptions.length === 0}
+                <div
+                  className={`item-picker ${status !== 'found' || itemOptions.length === 0 ? 'is-disabled' : ''}`}
                 >
-                  {itemOptions.map((option) => (
-                    <option key={option.id} value={option.labels.en}>
-                      {option.labels[locale]}
-                    </option>
-                  ))}
-                </select>
+                  {itemOptions.map((option) => {
+                    const selected = item === option.labels.en
+                    return (
+                      <button
+                        key={option.id}
+                        className={`item-card ${selected ? 'is-selected' : ''}`}
+                        type="button"
+                        onClick={() => setItem(option.labels.en)}
+                        disabled={status !== 'found' || itemOptions.length === 0}
+                      >
+                        <span className="item-card-label">{option.labels[locale]}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </label>
 
               <label>
@@ -298,14 +365,22 @@ function App() {
                   <article className="history-item" key={position.id}>
                     <div>
                       <strong>
-                        {position.item ? itemLabel(position.item, locale) : t(locale, 'scrap')}
+                        {position.item
+                          ? itemLabel(position.item, locale)
+                          : position.status === 'scrap'
+                            ? t(locale, 'scrap')
+                            : t(locale, 'nothingFound')}
                       </strong>
                       <p>
                         {position.x}, {position.y}
                       </p>
                     </div>
-                    <span className={position.status === 'found' ? 'pill found' : 'pill empty'}>
-                      {position.status === 'found' ? t(locale, 'found') : t(locale, 'scrap')}
+                    <span className={`pill ${position.status}`}>
+                      {position.status === 'found'
+                        ? t(locale, 'found')
+                        : position.status === 'scrap'
+                          ? t(locale, 'scrap')
+                          : t(locale, 'nothingFound')}
                     </span>
                   </article>
                 ))

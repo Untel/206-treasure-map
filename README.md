@@ -34,7 +34,18 @@ This repo is configured to deploy with GitHub Actions to GitHub Pages.
 2. In the repository, go to `Settings -> Pages`.
 3. Under `Build and deployment`, set `Source` to `GitHub Actions`.
 4. Make sure your default branch is `main`.
-5. Push to `main` or run the `Deploy to GitHub Pages` workflow manually from the `Actions` tab.
+5. Add these repository secrets under `Settings -> Secrets and variables -> Actions`:
+
+   ```txt
+   VITE_FIREBASE_API_KEY
+   VITE_FIREBASE_AUTH_DOMAIN
+   VITE_FIREBASE_PROJECT_ID
+   VITE_FIREBASE_STORAGE_BUCKET
+   VITE_FIREBASE_MESSAGING_SENDER_ID
+   VITE_FIREBASE_APP_ID
+   ```
+
+6. Push to `main` or run the `Deploy to GitHub Pages` workflow manually from the `Actions` tab.
 
 The Vite `base` path is resolved automatically during GitHub Actions builds from `GITHUB_REPOSITORY`, so the app works both locally at `/` and on Pages at `/<repo>/`.
 

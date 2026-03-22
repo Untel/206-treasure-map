@@ -58,9 +58,17 @@ function drawZones(ctx: CanvasRenderingContext2D, positions: PositionRecord[], l
       const width = ZONE_SIZE * SCALE_X
       const height = ZONE_SIZE * SCALE_Y
       const fill =
-        position.status === 'found' ? 'rgba(78, 232, 70, 0.18)' : 'rgba(122, 122, 122, 0.2)'
+        position.status === 'found'
+          ? 'rgba(78, 232, 70, 0.18)'
+          : position.status === 'scrap'
+            ? 'rgba(122, 122, 122, 0.2)'
+            : 'rgba(216, 58, 58, 0.16)'
       const stroke =
-        position.status === 'found' ? 'rgba(60, 174, 55, 0.9)' : 'rgba(110, 110, 110, 0.95)'
+        position.status === 'found'
+          ? 'rgba(60, 174, 55, 0.9)'
+          : position.status === 'scrap'
+            ? 'rgba(110, 110, 110, 0.95)'
+            : 'rgba(185, 44, 44, 0.95)'
 
       ctx.fillStyle = fill
       ctx.strokeStyle = stroke
@@ -165,8 +173,8 @@ export function MapCanvas({
       height={CANVAS_HEIGHT}
       onClick={(event) => {
         const rect = event.currentTarget.getBoundingClientRect()
-        const x = ((event.clientX - rect.left) / rect.width) * MAP_WIDTH
-        const y = ((event.clientY - rect.top) / rect.height) * MAP_HEIGHT
+        const x = Math.round(((event.clientX - rect.left) / rect.width) * MAP_WIDTH)
+        const y = Math.round(((event.clientY - rect.top) / rect.height) * MAP_HEIGHT)
         onSelectPoint({ x, y })
       }}
     />

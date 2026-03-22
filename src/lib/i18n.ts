@@ -10,6 +10,10 @@ export const UI_MESSAGES: Record<Locale, Messages> = {
     appTitle: 'Map coverage tracker',
     appCopy:
       'Register found objects and scrap zones, block the 25x25 zone around each record, and let the app propose the next high-value search square.',
+    tutorialTitle: 'How to record a not found result',
+    tutorialStep:
+      'In the game history, use the row marked with the red question mark. If the entry says nothing was found, record it here as Nothing found with the same coordinates.',
+    tutorialWarning: 'Red ? row = nothing found result',
     recordedZones: 'Recorded zones',
     coveredArea: 'Covered area',
     firebase: 'Firebase',
@@ -20,6 +24,7 @@ export const UI_MESSAGES: Record<Locale, Messages> = {
     jumpToSuggestion: 'Jump to suggested zone',
     foundObject: 'Found object',
     scrap: 'Scrap',
+    nothingFound: 'Nothing found',
     suggestedZone: 'Suggested next zone',
     registerPosition: 'Register a position',
     registerHint: 'Coordinates are the center of the blocked 25x25 square.',
@@ -52,6 +57,10 @@ export const UI_MESSAGES: Record<Locale, Messages> = {
     appTitle: 'マップ探索トラッカー',
     appCopy:
       '発見したオブジェクトとスクラップ地点を登録し、各記録の周囲 25x25 をブロックしながら、次に試す価値の高い区画を提案します。',
+    tutorialTitle: '未発見結果の記録方法',
+    tutorialStep:
+      'ゲーム履歴では、赤い「?」が付いた行を使います。何も見つからなかったと表示されたら、同じ座標を「何もなし」としてここに登録してください。',
+    tutorialWarning: '赤い ? の行 = 何も見つからない結果',
     recordedZones: '記録済みゾーン',
     coveredArea: '探索済み範囲',
     firebase: 'Firebase',
@@ -62,6 +71,7 @@ export const UI_MESSAGES: Record<Locale, Messages> = {
     jumpToSuggestion: '提案地点へ移動',
     foundObject: '発見済み',
     scrap: 'スクラップ',
+    nothingFound: '何もなし',
     suggestedZone: '次の候補',
     registerPosition: '位置を登録',
     registerHint: '座標はブロックする 25x25 区画の中心です。',
@@ -94,6 +104,10 @@ export const UI_MESSAGES: Record<Locale, Messages> = {
     appTitle: 'Theo dõi độ phủ bản đồ',
     appCopy:
       'Ghi lại vật thể đã tìm thấy và các điểm chỉ có phế liệu, chặn vùng 25x25 quanh mỗi bản ghi, rồi để ứng dụng đề xuất ô tiếp theo đáng thử nhất.',
+    tutorialTitle: 'Cách ghi kết quả không tìm thấy',
+    tutorialStep:
+      'Trong lịch sử trong game, hãy dùng dòng có dấu hỏi màu đỏ. Nếu dòng đó nói không tìm thấy gì, hãy ghi vào đây dưới dạng Không tìm thấy với đúng tọa độ đó.',
+    tutorialWarning: 'Dòng dấu ? đỏ = kết quả không tìm thấy',
     recordedZones: 'Số vùng đã ghi',
     coveredArea: 'Diện tích đã phủ',
     firebase: 'Firebase',
@@ -104,6 +118,7 @@ export const UI_MESSAGES: Record<Locale, Messages> = {
     jumpToSuggestion: 'Nhảy tới vùng gợi ý',
     foundObject: 'Đã tìm thấy',
     scrap: 'Phế liệu',
+    nothingFound: 'Không tìm thấy',
     suggestedZone: 'Vùng gợi ý',
     registerPosition: 'Đăng ký vị trí',
     registerHint: 'Tọa độ là tâm của ô 25x25 bị chặn.',

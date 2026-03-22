@@ -1,31 +1,34 @@
 import {
   MAP_HEIGHT,
   MAP_WIDTH,
-  ZONE_HALF_SIZE,
+  ZONE_RADIUS,
   ZONE_SIZE,
   type PositionRecord,
   type SuggestedZone,
 } from '../types/map'
 
 const SUGGESTION_STEP = 5
-const SUGGESTION_PADDING = ZONE_HALF_SIZE
+const MIN_X = ZONE_RADIUS
+const MAX_X = MAP_WIDTH - ZONE_RADIUS
+const MIN_Y = ZONE_RADIUS
+const MAX_Y = MAP_HEIGHT - ZONE_RADIUS
 const CENTER_X = MAP_WIDTH / 2
 const CENTER_Y = MAP_HEIGHT / 2
 
 export function clampXCoordinate(value: number) {
-  return Math.min(MAP_WIDTH - SUGGESTION_PADDING, Math.max(SUGGESTION_PADDING, value))
+  return Math.min(MAX_X, Math.max(MIN_X, Math.round(value)))
 }
 
 export function clampYCoordinate(value: number) {
-  return Math.min(MAP_HEIGHT - SUGGESTION_PADDING, Math.max(SUGGESTION_PADDING, value))
+  return Math.min(MAX_Y, Math.max(MIN_Y, Math.round(value)))
 }
 
 export function zoneBounds(x: number, y: number) {
   return {
-    left: x - ZONE_HALF_SIZE,
-    right: x + ZONE_HALF_SIZE,
-    top: y - ZONE_HALF_SIZE,
-    bottom: y + ZONE_HALF_SIZE,
+    left: x - ZONE_RADIUS,
+    right: x + ZONE_RADIUS + 1,
+    top: y - ZONE_RADIUS,
+    bottom: y + ZONE_RADIUS + 1,
   }
 }
 
@@ -77,13 +80,13 @@ export function suggestNextZone(positions: PositionRecord[]): SuggestedZone | nu
   let best: SuggestedZone | null = null
 
   for (
-    let y = SUGGESTION_PADDING;
-    y <= MAP_HEIGHT - SUGGESTION_PADDING;
+    let y = MIN_Y;
+    y <= MAX_Y;
     y += SUGGESTION_STEP
   ) {
     for (
-      let x = SUGGESTION_PADDING;
-      x <= MAP_WIDTH - SUGGESTION_PADDING;
+      let x = MIN_X;
+      x <= MAX_X;
       x += SUGGESTION_STEP
     ) {
       const candidate = { x, y }

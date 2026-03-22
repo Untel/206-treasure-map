@@ -9,11 +9,11 @@ export const UI_MESSAGES: Record<Locale, Messages> = {
     appTagline: '509 x 1021 research board',
     appTitle: 'Map coverage tracker',
     appCopy:
-      'Track found objects, scrap, and empty searches on a compact research board, then let the app propose the next best zone to test.',
-    tutorialTitle: 'How to record a not found result',
+      "This app is mainly for tracking what has already been explored so nobody wastes digs on the same area twice. The most important thing to record is when you found nothing, because that excludes the whole 25x25 zone from future research.",
+    tutorialTitle: 'Please record nothing found results first',
     tutorialStep:
-      'In the game history, use the row marked with the red question mark. If the entry says nothing was found, record it here as Nothing found with the same coordinates.',
-    tutorialWarning: 'Red ? row = nothing found result',
+      'In the game history, use the row marked with the red question mark. If the entry says nothing was found, record it here as Nothing found with the same coordinates. Do not only register found objects.',
+    tutorialWarning: 'Red ? row = nothing found, and that is the most important data to save',
     recordedZones: 'Recorded zones',
     coveredArea: 'Covered area',
     firebase: 'Firebase',
@@ -61,11 +61,11 @@ export const UI_MESSAGES: Record<Locale, Messages> = {
     appTagline: '509 x 1021 調査マップ',
     appTitle: 'マップ探索トラッカー',
     appCopy:
-      '発見したオブジェクト、スクラップ、未発見地点をコンパクトに記録し、次に試す価値の高い区画を提案します。',
-    tutorialTitle: '未発見結果の記録方法',
+      'このアプリの主な目的は、すでに探索済みの範囲を記録して、同じ場所を二度掘らないようにすることです。特に重要なのは「何も見つからなかった」結果で、その 25x25 区画を今後の探索対象から外せます。',
+    tutorialTitle: 'まず「何もなし」の結果を記録してください',
     tutorialStep:
-      'ゲーム履歴では、赤い「?」が付いた行を使います。何も見つからなかったと表示されたら、同じ座標を「何もなし」としてここに登録してください。',
-    tutorialWarning: '赤い ? の行 = 何も見つからない結果',
+      'ゲーム履歴では、赤い「?」が付いた行を使います。何も見つからなかったと表示されたら、同じ座標を「何もなし」としてここに登録してください。発見した物だけを登録しないでください。',
+    tutorialWarning: '赤い ? の行 = 何も見つからなかった結果。これが最も重要な記録です',
     recordedZones: '記録済みゾーン',
     coveredArea: '探索済み範囲',
     firebase: 'Firebase',
@@ -113,11 +113,11 @@ export const UI_MESSAGES: Record<Locale, Messages> = {
     appTagline: 'Bản đồ nghiên cứu 509 x 1021',
     appTitle: 'Theo dõi độ phủ bản đồ',
     appCopy:
-      'Ghi lại vật thể đã tìm thấy, phế liệu và các lượt không tìm thấy trên bảng nghiên cứu gọn hơn, rồi để ứng dụng đề xuất vùng tiếp theo đáng thử nhất.',
-    tutorialTitle: 'Cách ghi kết quả không tìm thấy',
+      'Mục tiêu chính của ứng dụng này là theo dõi những vùng đã được khám phá để không ai phải đào lại cùng một chỗ. Dữ liệu quan trọng nhất là các lượt không tìm thấy gì, vì chúng giúp loại toàn bộ vùng 25x25 đó khỏi lần tìm kiếm sau.',
+    tutorialTitle: 'Hãy ưu tiên ghi các lần không tìm thấy gì',
     tutorialStep:
-      'Trong lịch sử trong game, hãy dùng dòng có dấu hỏi màu đỏ. Nếu dòng đó nói không tìm thấy gì, hãy ghi vào đây dưới dạng Không tìm thấy với đúng tọa độ đó.',
-    tutorialWarning: 'Dòng dấu ? đỏ = kết quả không tìm thấy',
+      'Trong lịch sử trong game, hãy dùng dòng có dấu hỏi màu đỏ. Nếu dòng đó nói không tìm thấy gì, hãy ghi vào đây dưới dạng Không tìm thấy với đúng tọa độ đó. Đừng chỉ ghi lại các vật thể đã tìm thấy.',
+    tutorialWarning: 'Dòng dấu ? đỏ = không tìm thấy gì, và đó là dữ liệu quan trọng nhất cần lưu',
     recordedZones: 'Số vùng đã ghi',
     coveredArea: 'Diện tích đã phủ',
     firebase: 'Firebase',

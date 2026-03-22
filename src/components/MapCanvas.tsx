@@ -3,11 +3,12 @@ import {
   MAP_HEIGHT,
   MAP_WIDTH,
   ZONE_SIZE,
+  type PromisingArea,
   type PositionRecord,
   type SuggestedZone,
 } from '../types/map'
 import { itemLabel } from '../lib/items'
-import type { Locale } from '../lib/i18n'
+import { t, type Locale } from '../lib/i18n'
 import { zoneBounds } from '../lib/map'
 
 const CANVAS_WIDTH = 760
@@ -15,9 +16,17 @@ const CANVAS_HEIGHT = Math.round((CANVAS_WIDTH * MAP_HEIGHT) / MAP_WIDTH)
 const SCALE_X = CANVAS_WIDTH / MAP_WIDTH
 const SCALE_Y = CANVAS_HEIGHT / MAP_HEIGHT
 
+function regionCenter(region: PromisingArea) {
+  return {
+    x: Math.round((region.left + region.right - 1) / 2),
+    y: Math.round((region.top + region.bottom - 1) / 2),
+  }
+}
+
 type MapCanvasProps = {
   positions: PositionRecord[]
   suggestion: SuggestedZone | null
+  promisingAreas: PromisingArea[]
   selectedPoint: { x: number; y: number }
   selectedRecordId: string | null
   locale: Locale
@@ -49,7 +58,11 @@ function drawGrid(ctx: CanvasRenderingContext2D) {
   ctx.restore()
 }
 
-function createHatchPattern(ctx: CanvasRenderingContext2D) {
+function createHatchPattern(
+  ctx: CanvasRenderingContext2D,
+  color: string,
+  background = 'transparent',
+) {
   const patternCanvas = document.createElement('canvas')
   patternCanvas.width = 12
   patternCanvas.height = 12
@@ -58,7 +71,12 @@ function createHatchPattern(ctx: CanvasRenderingContext2D) {
     return null
   }
 
-  patternContext.strokeStyle = 'rgba(82, 70, 48, 0.3)'
+  if (background !== 'transparent') {
+    patternContext.fillStyle = background
+    patternContext.fillRect(0, 0, patternCanvas.width, patternCanvas.height)
+  }
+
+  patternContext.strokeStyle = color
   patternContext.lineWidth = 1.5
   patternContext.beginPath()
   patternContext.moveTo(0, 12)
@@ -82,7 +100,7 @@ function drawZones(
   locale: Locale,
   selectedRecordId: string | null,
 ) {
-  const hatchPattern = createHatchPattern(ctx)
+  const hatchPattern = createHatchPattern(ctx, 'rgba(82, 70, 48, 0.3)')
   positions
     .slice()
     .reverse()
@@ -130,28 +148,61 @@ function drawZones(
     })
 }
 
-function drawSuggestion(ctx: CanvasRenderingContext2D, suggestion: SuggestedZone | null) {
-  if (!suggestion) {
-    return
+function drawPromisingAreas(
+  ctx: CanvasRenderingContext2D,
+  promisingAreas: PromisingArea[],
+  locale: Locale,
+) {
+  ctx.save()
+  const suggestionPattern = createHatchPattern(
+    ctx,
+    'rgba(35, 128, 68, 0.72)',
+    'rgba(126, 208, 144, 0.24)',
+  )
+  for (const [index, region] of promisingAreas.entries()) {
+    const x = region.left * SCALE_X
+    const y = region.top * SCALE_Y
+    const width = (region.right - region.left) * SCALE_X
+    const height = (region.bottom - region.top) * SCALE_Y
+    ctx.fillStyle = suggestionPattern ?? 'rgba(126, 208, 144, 0.28)'
+    ctx.strokeStyle = index === 0 ? '#247d43' : 'rgba(36, 125, 67, 0.7)'
+    ctx.lineWidth = index === 0 ? 3 : 2
+    ctx.fillRect(x, y, width, height)
+    ctx.strokeRect(x, y, width, height)
   }
 
-  const bounds = zoneBounds(suggestion.x, suggestion.y)
-  const x = bounds.left * SCALE_X
-  const y = bounds.top * SCALE_Y
-  const width = ZONE_SIZE * SCALE_X
-  const height = ZONE_SIZE * SCALE_Y
+  if (promisingAreas.length > 0) {
+    const label = t(locale, 'mapGoodToStartDigging')
+    const focusRegion = promisingAreas[0]
+    const focusX = focusRegion.left * SCALE_X
+    const focusY = focusRegion.top * SCALE_Y
+    ctx.font = '700 13px "Trebuchet MS", sans-serif'
+    const textWidth = ctx.measureText(label).width
+    const paddingX = 10
+    const paddingY = 7
+    const badgeWidth = textWidth + paddingX * 2
+    const badgeHeight = 30
+    const preferredX = focusX + 24
+    const preferredY = focusY - badgeHeight - 12
+    const badgeX = Math.max(12, Math.min(CANVAS_WIDTH - badgeWidth - 12, preferredX))
+    const badgeY = Math.max(12, preferredY)
 
-  ctx.save()
-  ctx.fillStyle = 'rgba(43, 122, 98, 0.16)'
-  ctx.strokeStyle = '#0c6f5f'
-  ctx.setLineDash([8, 6])
-  ctx.lineWidth = 3
-  ctx.fillRect(x, y, width, height)
-  ctx.strokeRect(x, y, width, height)
-  ctx.beginPath()
-  ctx.arc(suggestion.x * SCALE_X, suggestion.y * SCALE_Y, 6, 0, Math.PI * 2)
-  ctx.fillStyle = '#0c6f5f'
-  ctx.fill()
+    ctx.strokeStyle = '#247d43'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 10)
+    ctx.fillStyle = 'rgba(214, 247, 220, 0.96)'
+    ctx.fill()
+    ctx.stroke()
+
+    ctx.beginPath()
+    ctx.moveTo(badgeX + 24, badgeY + badgeHeight)
+    ctx.lineTo(focusX + 8, focusY + 2)
+    ctx.stroke()
+
+    ctx.fillStyle = '#174c29'
+    ctx.fillText(label, badgeX + paddingX, badgeY + badgeHeight - paddingY - 2)
+  }
   ctx.restore()
 }
 
@@ -171,6 +222,7 @@ function drawSelection(ctx: CanvasRenderingContext2D, point: { x: number; y: num
 export function MapCanvas({
   positions,
   suggestion,
+  promisingAreas,
   selectedPoint,
   selectedRecordId,
   locale,
@@ -199,10 +251,21 @@ export function MapCanvas({
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
 
     drawGrid(ctx)
-    drawSuggestion(ctx, suggestion)
     drawZones(ctx, positions, locale, selectedRecordId)
+    drawPromisingAreas(ctx, promisingAreas, locale)
+    if (suggestion) {
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(suggestion.x * SCALE_X, suggestion.y * SCALE_Y, 6, 0, Math.PI * 2)
+      ctx.fillStyle = '#f2b705'
+      ctx.fill()
+      ctx.strokeStyle = 'rgba(88, 60, 0, 0.8)'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+      ctx.restore()
+    }
     drawSelection(ctx, selectedPoint)
-  }, [locale, positions, selectedPoint, selectedRecordId, suggestion])
+  }, [locale, positions, promisingAreas, selectedPoint, selectedRecordId, suggestion])
 
   return (
     <canvas
@@ -214,6 +277,18 @@ export function MapCanvas({
         const rect = event.currentTarget.getBoundingClientRect()
         const x = Math.round(((event.clientX - rect.left) / rect.width) * MAP_WIDTH)
         const y = Math.round(((event.clientY - rect.top) / rect.height) * MAP_HEIGHT)
+        const clickedPromisingArea = promisingAreas.find(
+          (region) =>
+            x >= region.left &&
+            x < region.right &&
+            y >= region.top &&
+            y < region.bottom,
+        )
+        if (clickedPromisingArea) {
+          onSelectRecord(null)
+          onSelectPoint(regionCenter(clickedPromisingArea))
+          return
+        }
         const hit = positions.find(
           (position) => Math.hypot(position.x - x, position.y - y) <= 12,
         )

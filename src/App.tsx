@@ -1,21 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MapCanvas } from './components/MapCanvas'
-import { getFirebaseStatus, savePosition, subscribeToPositions } from './lib/firebase'
+import { savePosition, subscribeToPositions } from './lib/firebase'
 import { availableItems, itemLabel } from './lib/items'
 import { LOCALES, t, type Locale } from './lib/i18n'
 import {
   clampXCoordinate,
   clampYCoordinate,
   coveragePercentage,
+  getPromisingAreas,
   isPlacementValid,
   suggestNextZone,
 } from './lib/map'
 import { MAP_HEIGHT, MAP_WIDTH, type PositionDraft, type PositionRecord } from './types/map'
 
-const initialPoint = { x: MAP_WIDTH / 2, y: MAP_HEIGHT / 2 }
+const initialPoint = { x: Math.floor(MAP_WIDTH / 2), y: Math.floor(MAP_HEIGHT / 2) }
 
 function App() {
-  const firebaseStatus = getFirebaseStatus()
   const [positions, setPositions] = useState<PositionRecord[]>([])
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [selectedPoint, setSelectedPoint] = useState(initialPoint)
@@ -35,6 +35,7 @@ function App() {
   }, [])
 
   const suggestion = useMemo(() => suggestNextZone(positions), [positions])
+  const promisingAreas = useMemo(() => getPromisingAreas(positions), [positions])
   const coverage = useMemo(() => coveragePercentage(positions), [positions])
   const foundItems = useMemo(
     () => positions.filter((position) => position.status === 'found').map((position) => position.item),
@@ -170,6 +171,7 @@ function App() {
             locale={locale}
             positions={positions}
             suggestion={suggestion}
+            promisingAreas={promisingAreas}
             selectedPoint={candidate}
             selectedRecordId={selectedRecordId}
             onSelectPoint={setSelectedPoint}
@@ -343,16 +345,6 @@ function App() {
             {status === 'found' && itemOptions.length === 0 ? (
               <p className="info-text">{t(locale, 'allFound')}</p>
             ) : null}
-            {firebaseStatus.mode === 'local-storage' ? (
-              <p className="warning-text">
-                Firebase is not configured in this build. Using browser local storage.
-                {firebaseStatus.missingFirebaseEnvKeys.length > 0
-                  ? ` Missing: ${firebaseStatus.missingFirebaseEnvKeys.join(', ')}`
-                  : ''}
-              </p>
-            ) : (
-              <p className="info-text">Connected to Firestore.</p>
-            )}
             {error ? <p className="error-text">{error}</p> : null}
           </section>
 

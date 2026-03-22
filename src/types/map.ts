@@ -25,3 +25,12 @@ export type SuggestedZone = {
   clearance: number
   area: number
 }
+
+export type PromisingArea = {
+  id: string
+  left: number
+  top: number
+  right: number
+  bottom: number
+  area: number
+}

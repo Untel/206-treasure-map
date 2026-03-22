@@ -1,0 +1,18 @@
+export const ITEM_OPTIONS = [
+  'Flower Bed',
+  'Straw Hall',
+  'Canopy Tent',
+  'Beast Bone Totem',
+  'Portal Gate',
+  'Broken Wheel',
+  'Signpost',
+  'Treasure Hunter',
+  'Leather Boots',
+  'Scrap',
+  'Water Reservoir',
+  'Blue Gem',
+  'Broken Bottle',
+  'Giant Egg',
+  'Sandstorm Fortress',
+  'Boss Throne',
+]

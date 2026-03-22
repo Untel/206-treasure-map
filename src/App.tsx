@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MapCanvas } from './components/MapCanvas'
-import { isFirebaseReady, savePosition, subscribeToPositions } from './lib/firebase'
+import { getFirebaseStatus, savePosition, subscribeToPositions } from './lib/firebase'
 import { availableItems, itemLabel } from './lib/items'
 import { LOCALES, t, type Locale } from './lib/i18n'
 import {
@@ -15,13 +15,16 @@ import { MAP_HEIGHT, MAP_WIDTH, type PositionDraft, type PositionRecord } from '
 const initialPoint = { x: MAP_WIDTH / 2, y: MAP_HEIGHT / 2 }
 
 function App() {
+  const firebaseStatus = getFirebaseStatus()
   const [positions, setPositions] = useState<PositionRecord[]>([])
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [selectedPoint, setSelectedPoint] = useState(initialPoint)
   const [xInput, setXInput] = useState(String(initialPoint.x))
   const [yInput, setYInput] = useState(String(initialPoint.y))
   const [locale, setLocale] = useState<Locale>('en')
-  const [status, setStatus] = useState<'found' | 'scrap' | 'nothing'>('found')
+  const [status, setStatus] = useState<'found' | 'scrap' | 'nothing'>('nothing')
   const [item, setItem] = useState('')
+  const [nickname, setNickname] = useState('')
   const [note, setNote] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
@@ -38,6 +41,10 @@ function App() {
     [positions],
   )
   const itemOptions = useMemo(() => availableItems(foundItems), [foundItems])
+  const selectedRecord = useMemo(
+    () => positions.find((position) => position.id === selectedRecordId) ?? null,
+    [positions, selectedRecordId],
+  )
 
   useEffect(() => {
     if (status !== 'found') {
@@ -59,6 +66,7 @@ function App() {
     y: clampYCoordinate(selectedPoint.y),
     status,
     item: status === 'found' ? item || null : null,
+    nickname: nickname.trim(),
     note: note.trim(),
   }
 
@@ -66,19 +74,20 @@ function App() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setSelectedPoint({
+    const clampedPoint = {
       x: clampXCoordinate(selectedPoint.x),
       y: clampYCoordinate(selectedPoint.y),
-    })
-    if (!candidateIsValid) {
-      setError(t(locale, 'overlapError'))
-      return
     }
+    setSelectedPoint(clampedPoint)
 
     try {
       setIsSaving(true)
       setError('')
-      await savePosition(candidate)
+      await savePosition({
+        ...candidate,
+        x: clampedPoint.x,
+        y: clampedPoint.y,
+      })
       setNote('')
     } catch (submissionError) {
       setError(
@@ -91,26 +100,28 @@ function App() {
 
   return (
     <main className="app-shell">
-      <section className="tutorial-panel">
-        <div className="tutorial-mark">?</div>
-        <div>
-          <p className="eyebrow">{t(locale, 'tutorialTitle')}</p>
-          <p className="tutorial-copy">{t(locale, 'tutorialStep')}</p>
-        </div>
-        <div className="history-demo">
-          <span className="history-icon">?</span>
-          <span>{t(locale, 'tutorialWarning')}</span>
-        </div>
-      </section>
-
       <section className="hero-panel">
-        <div>
+        <div className="hero-main">
           <p className="eyebrow">{t(locale, 'appTagline')}</p>
           <h1>{t(locale, 'appTitle')}</h1>
           <p className="hero-copy">{t(locale, 'appCopy')}</p>
+
+          <div className="tutorial-inline">
+            <div className="tutorial-mark">?</div>
+            <div>
+              <p className="eyebrow">{t(locale, 'tutorialTitle')}</p>
+              <p className="tutorial-copy">{t(locale, 'tutorialStep')}</p>
+            </div>
+          </div>
         </div>
 
-        <div className="summary-grid">
+        <div className="hero-side">
+          <div className="history-demo">
+            <span className="history-icon">?</span>
+            <span>{t(locale, 'tutorialWarning')}</span>
+          </div>
+
+          <div className="summary-grid compact">
           <article className="summary-card">
             <span>{t(locale, 'recordedZones')}</span>
             <strong>{positions.length}</strong>
@@ -118,10 +129,6 @@ function App() {
           <article className="summary-card">
             <span>{t(locale, 'coveredArea')}</span>
             <strong>{coverage.toFixed(2)}%</strong>
-          </article>
-          <article className="summary-card">
-            <span>{t(locale, 'firebase')}</span>
-            <strong>{isFirebaseReady() ? t(locale, 'live') : t(locale, 'localFallback')}</strong>
           </article>
           <article className="summary-card">
             <span>{t(locale, 'locale')}</span>
@@ -137,6 +144,7 @@ function App() {
               ))}
             </select>
           </article>
+        </div>
         </div>
       </section>
 
@@ -163,7 +171,9 @@ function App() {
             positions={positions}
             suggestion={suggestion}
             selectedPoint={candidate}
+            selectedRecordId={selectedRecordId}
             onSelectPoint={setSelectedPoint}
+            onSelectRecord={(record) => setSelectedRecordId(record?.id ?? null)}
           />
 
           <div className="legend">
@@ -275,26 +285,38 @@ function App() {
               </label>
 
               <label>
-                {t(locale, 'item')}
-                <div
-                  className={`item-picker ${status !== 'found' || itemOptions.length === 0 ? 'is-disabled' : ''}`}
-                >
-                  {itemOptions.map((option) => {
-                    const selected = item === option.labels.en
-                    return (
-                      <button
-                        key={option.id}
-                        className={`item-card ${selected ? 'is-selected' : ''}`}
-                        type="button"
-                        onClick={() => setItem(option.labels.en)}
-                        disabled={status !== 'found' || itemOptions.length === 0}
-                      >
-                        <span className="item-card-label">{option.labels[locale]}</span>
-                      </button>
-                    )
-                  })}
-                </div>
+                {t(locale, 'nickname')}
+                <input
+                  type="text"
+                  value={nickname}
+                  onChange={(event) => setNickname(event.target.value)}
+                  maxLength={32}
+                />
               </label>
+
+              {status === 'found' ? (
+                <label>
+                  {t(locale, 'item')}
+                  <div
+                    className={`item-picker ${itemOptions.length === 0 ? 'is-disabled' : ''}`}
+                  >
+                    {itemOptions.map((option) => {
+                      const selected = item === option.labels.en
+                      return (
+                        <button
+                          key={option.id}
+                          className={`item-card ${selected ? 'is-selected' : ''}`}
+                          type="button"
+                          onClick={() => setItem(option.labels.en)}
+                          disabled={itemOptions.length === 0}
+                        >
+                          <span className="item-card-label">{option.labels[locale]}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </label>
+              ) : null}
 
               <label>
                 {t(locale, 'note')}
@@ -309,7 +331,7 @@ function App() {
               <button
                 className="primary-button"
                 type="submit"
-                disabled={isSaving || !candidateIsValid || (status === 'found' && itemOptions.length === 0)}
+                disabled={isSaving || (status === 'found' && itemOptions.length === 0)}
               >
                 {isSaving ? t(locale, 'saving') : t(locale, 'savePosition')}
               </button>
@@ -321,10 +343,17 @@ function App() {
             {status === 'found' && itemOptions.length === 0 ? (
               <p className="info-text">{t(locale, 'allFound')}</p>
             ) : null}
+            {firebaseStatus.mode === 'local-storage' ? (
+              <p className="warning-text">
+                Firebase is not configured in this build. Using browser local storage.
+                {firebaseStatus.missingFirebaseEnvKeys.length > 0
+                  ? ` Missing: ${firebaseStatus.missingFirebaseEnvKeys.join(', ')}`
+                  : ''}
+              </p>
+            ) : (
+              <p className="info-text">Connected to Firestore.</p>
+            )}
             {error ? <p className="error-text">{error}</p> : null}
-            {!isFirebaseReady() ? (
-              <p className="info-text">{t(locale, 'firebaseHint')}</p>
-            ) : null}
           </section>
 
           <section className="card">
@@ -341,11 +370,43 @@ function App() {
                   ({suggestion.x}, {suggestion.y})
                 </strong>
                 <span>
-                  {t(locale, 'clearanceScore')}: {suggestion.clearance.toFixed(1)}
+                  {t(locale, 'clearanceScore')}: {suggestion.clearance.toFixed(1)} / {suggestion.area}
                 </span>
               </div>
             ) : (
               <p className="info-text">{t(locale, 'noValidSquare')}</p>
+            )}
+          </section>
+
+          <section className="card">
+            <div className="panel-header">
+              <div>
+                <h2>{t(locale, 'selectedPoint')}</h2>
+                <p>{t(locale, 'selectedPointHint')}</p>
+              </div>
+            </div>
+
+            {selectedRecord ? (
+              <div className="suggestion-box selected-record">
+                <strong>
+                  {selectedRecord.item
+                    ? itemLabel(selectedRecord.item, locale)
+                    : selectedRecord.status === 'scrap'
+                      ? t(locale, 'scrap')
+                      : t(locale, 'nothingFound')}
+                </strong>
+                <span>
+                  {selectedRecord.x}, {selectedRecord.y}
+                </span>
+                {selectedRecord.nickname ? (
+                  <span>
+                    {t(locale, 'recordedBy')}: {selectedRecord.nickname}
+                  </span>
+                ) : null}
+                {selectedRecord.note ? <span>{selectedRecord.note}</span> : null}
+              </div>
+            ) : (
+              <p className="info-text">{t(locale, 'selectedPointHint')}</p>
             )}
           </section>
 
@@ -362,7 +423,14 @@ function App() {
                 <p className="info-text">{t(locale, 'noPositions')}</p>
               ) : (
                 positions.map((position) => (
-                  <article className="history-item" key={position.id}>
+                  <article
+                    className={`history-item ${selectedRecordId === position.id ? 'is-selected' : ''}`}
+                    key={position.id}
+                    onClick={() => {
+                      setSelectedRecordId(position.id)
+                      setSelectedPoint({ x: position.x, y: position.y })
+                    }}
+                  >
                     <div>
                       <strong>
                         {position.item
@@ -371,6 +439,11 @@ function App() {
                             ? t(locale, 'scrap')
                             : t(locale, 'nothingFound')}
                       </strong>
+                      {position.nickname ? (
+                        <p className="history-meta">
+                          {t(locale, 'recordedBy')}: {position.nickname}
+                        </p>
+                      ) : null}
                       <p>
                         {position.x}, {position.y}
                       </p>

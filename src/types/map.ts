@@ -11,6 +11,7 @@ export type PositionRecord = {
   y: number
   status: PositionStatus
   item: string | null
+  nickname: string
   note: string
   createdAt: string
 }
@@ -22,4 +23,5 @@ export type SuggestedZone = {
   y: number
   score: number
   clearance: number
+  area: number
 }

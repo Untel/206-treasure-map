@@ -77,32 +77,79 @@ function centerBias(candidate: Pick<PositionRecord, 'x' | 'y'>) {
 }
 
 export function suggestNextZone(positions: PositionRecord[]): SuggestedZone | null {
+  const columns = Math.floor((MAX_X - MIN_X) / SUGGESTION_STEP) + 1
+  const rows = Math.floor((MAX_Y - MIN_Y) / SUGGESTION_STEP) + 1
+  const validCells: boolean[][] = Array.from({ length: rows }, () => Array<boolean>(columns).fill(false))
+
+  for (let row = 0; row < rows; row += 1) {
+    const y = MIN_Y + row * SUGGESTION_STEP
+    for (let column = 0; column < columns; column += 1) {
+      const x = MIN_X + column * SUGGESTION_STEP
+      validCells[row][column] = isPlacementValid({ x, y }, positions)
+    }
+  }
+
+  const visited: boolean[][] = Array.from({ length: rows }, () => Array<boolean>(columns).fill(false))
+  const directions = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ] as const
   let best: SuggestedZone | null = null
 
-  for (
-    let y = MIN_Y;
-    y <= MAX_Y;
-    y += SUGGESTION_STEP
-  ) {
-    for (
-      let x = MIN_X;
-      x <= MAX_X;
-      x += SUGGESTION_STEP
-    ) {
-      const candidate = { x, y }
-      if (!isPlacementValid(candidate, positions)) {
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      if (!validCells[row][column] || visited[row][column]) {
         continue
       }
 
-      const clearance = nearestDistance(candidate, positions)
-      const score = 625 + clearance * 0.1 - centerBias(candidate) * 0.01
+      const queue: Array<[number, number]> = [[row, column]]
+      const component: Array<[number, number]> = []
+      visited[row][column] = true
 
-      if (
-        !best ||
-        score > best.score ||
-        (score === best.score && clearance > best.clearance)
-      ) {
-        best = { x, y, score, clearance }
+      while (queue.length > 0) {
+        const current = queue.shift()!
+        component.push(current)
+
+        for (const [rowOffset, columnOffset] of directions) {
+          const nextRow = current[0] + rowOffset
+          const nextColumn = current[1] + columnOffset
+
+          if (
+            nextRow < 0 ||
+            nextRow >= rows ||
+            nextColumn < 0 ||
+            nextColumn >= columns ||
+            visited[nextRow][nextColumn] ||
+            !validCells[nextRow][nextColumn]
+          ) {
+            continue
+          }
+
+          visited[nextRow][nextColumn] = true
+          queue.push([nextRow, nextColumn])
+        }
+      }
+
+      const componentArea = component.length * SUGGESTION_STEP * SUGGESTION_STEP
+
+      for (const [componentRow, componentColumn] of component) {
+        const candidate = {
+          x: MIN_X + componentColumn * SUGGESTION_STEP,
+          y: MIN_Y + componentRow * SUGGESTION_STEP,
+        }
+        const clearance = nearestDistance(candidate, positions)
+        const score = componentArea + clearance * 2 - centerBias(candidate) * 0.03
+
+        if (
+          !best ||
+          score > best.score ||
+          (score === best.score && componentArea > best.area) ||
+          (score === best.score && componentArea === best.area && clearance > best.clearance)
+        ) {
+          best = { ...candidate, score, clearance, area: componentArea }
+        }
       }
     }
   }

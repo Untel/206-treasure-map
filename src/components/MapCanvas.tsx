@@ -19,8 +19,10 @@ type MapCanvasProps = {
   positions: PositionRecord[]
   suggestion: SuggestedZone | null
   selectedPoint: { x: number; y: number }
+  selectedRecordId: string | null
   locale: Locale
   onSelectPoint: (point: { x: number; y: number }) => void
+  onSelectRecord: (record: PositionRecord | null) => void
 }
 
 function drawGrid(ctx: CanvasRenderingContext2D) {
@@ -47,7 +49,40 @@ function drawGrid(ctx: CanvasRenderingContext2D) {
   ctx.restore()
 }
 
-function drawZones(ctx: CanvasRenderingContext2D, positions: PositionRecord[], locale: Locale) {
+function createHatchPattern(ctx: CanvasRenderingContext2D) {
+  const patternCanvas = document.createElement('canvas')
+  patternCanvas.width = 12
+  patternCanvas.height = 12
+  const patternContext = patternCanvas.getContext('2d')
+  if (!patternContext) {
+    return null
+  }
+
+  patternContext.strokeStyle = 'rgba(82, 70, 48, 0.3)'
+  patternContext.lineWidth = 1.5
+  patternContext.beginPath()
+  patternContext.moveTo(0, 12)
+  patternContext.lineTo(12, 0)
+  patternContext.stroke()
+  patternContext.beginPath()
+  patternContext.moveTo(-4, 12)
+  patternContext.lineTo(4, 4)
+  patternContext.stroke()
+  patternContext.beginPath()
+  patternContext.moveTo(8, 12)
+  patternContext.lineTo(12, 8)
+  patternContext.stroke()
+
+  return ctx.createPattern(patternCanvas, 'repeat')
+}
+
+function drawZones(
+  ctx: CanvasRenderingContext2D,
+  positions: PositionRecord[],
+  locale: Locale,
+  selectedRecordId: string | null,
+) {
+  const hatchPattern = createHatchPattern(ctx)
   positions
     .slice()
     .reverse()
@@ -57,29 +92,31 @@ function drawZones(ctx: CanvasRenderingContext2D, positions: PositionRecord[], l
       const y = bounds.top * SCALE_Y
       const width = ZONE_SIZE * SCALE_X
       const height = ZONE_SIZE * SCALE_Y
-      const fill =
+      const markerFill =
         position.status === 'found'
-          ? 'rgba(78, 232, 70, 0.18)'
-          : position.status === 'scrap'
-            ? 'rgba(122, 122, 122, 0.2)'
-            : 'rgba(216, 58, 58, 0.16)'
-      const stroke =
-        position.status === 'found'
-          ? 'rgba(60, 174, 55, 0.9)'
+          ? 'rgba(60, 174, 55, 0.95)'
           : position.status === 'scrap'
             ? 'rgba(110, 110, 110, 0.95)'
             : 'rgba(185, 44, 44, 0.95)'
+      const zoneStroke = position.id === selectedRecordId ? '#1e4f45' : 'rgba(82, 70, 48, 0.55)'
 
-      ctx.fillStyle = fill
-      ctx.strokeStyle = stroke
-      ctx.lineWidth = 2
+      ctx.fillStyle = 'rgba(255, 250, 239, 0.2)'
       ctx.fillRect(x, y, width, height)
+      if (hatchPattern) {
+        ctx.fillStyle = hatchPattern
+        ctx.fillRect(x, y, width, height)
+      }
+      ctx.strokeStyle = zoneStroke
+      ctx.lineWidth = position.id === selectedRecordId ? 2.5 : 1.6
       ctx.strokeRect(x, y, width, height)
 
       ctx.beginPath()
-      ctx.fillStyle = stroke
-      ctx.arc(position.x * SCALE_X, position.y * SCALE_Y, 4, 0, Math.PI * 2)
+      ctx.fillStyle = markerFill
+      ctx.arc(position.x * SCALE_X, position.y * SCALE_Y, position.id === selectedRecordId ? 5.5 : 4.2, 0, Math.PI * 2)
       ctx.fill()
+      ctx.strokeStyle = 'rgba(255, 248, 231, 0.8)'
+      ctx.lineWidth = 1.2
+      ctx.stroke()
 
       if (position.item) {
         const label = itemLabel(position.item, locale)
@@ -135,8 +172,10 @@ export function MapCanvas({
   positions,
   suggestion,
   selectedPoint,
+  selectedRecordId,
   locale,
   onSelectPoint,
+  onSelectRecord,
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
@@ -161,9 +200,9 @@ export function MapCanvas({
 
     drawGrid(ctx)
     drawSuggestion(ctx, suggestion)
-    drawZones(ctx, positions, locale)
+    drawZones(ctx, positions, locale, selectedRecordId)
     drawSelection(ctx, selectedPoint)
-  }, [locale, positions, selectedPoint, suggestion])
+  }, [locale, positions, selectedPoint, selectedRecordId, suggestion])
 
   return (
     <canvas
@@ -175,6 +214,15 @@ export function MapCanvas({
         const rect = event.currentTarget.getBoundingClientRect()
         const x = Math.round(((event.clientX - rect.left) / rect.width) * MAP_WIDTH)
         const y = Math.round(((event.clientY - rect.top) / rect.height) * MAP_HEIGHT)
+        const hit = positions.find(
+          (position) => Math.hypot(position.x - x, position.y - y) <= 12,
+        )
+        if (hit) {
+          onSelectRecord(hit)
+          onSelectPoint({ x: hit.x, y: hit.y })
+          return
+        }
+        onSelectRecord(null)
         onSelectPoint({ x, y })
       }}
     />

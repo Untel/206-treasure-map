@@ -20,16 +20,28 @@ type FirebaseConfig = {
   appId: string
 }
 
+const firebaseEnvMap = {
+  VITE_FIREBASE_API_KEY: import.meta.env.VITE_FIREBASE_API_KEY ?? '',
+  VITE_FIREBASE_AUTH_DOMAIN: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? '',
+  VITE_FIREBASE_PROJECT_ID: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? '',
+  VITE_FIREBASE_STORAGE_BUCKET: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? '',
+  VITE_FIREBASE_MESSAGING_SENDER_ID: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? '',
+  VITE_FIREBASE_APP_ID: import.meta.env.VITE_FIREBASE_APP_ID ?? '',
+} as const
+
 const firebaseConfig: FirebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? '',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? '',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? '',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? '',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? '',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID ?? '',
+  apiKey: firebaseEnvMap.VITE_FIREBASE_API_KEY,
+  authDomain: firebaseEnvMap.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: firebaseEnvMap.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: firebaseEnvMap.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: firebaseEnvMap.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: firebaseEnvMap.VITE_FIREBASE_APP_ID,
 }
 
 const hasFirebaseConfig = Object.values(firebaseConfig).every(Boolean)
+const missingFirebaseEnvKeys = Object.entries(firebaseEnvMap)
+  .filter(([, value]) => !value)
+  .map(([key]) => key)
 
 const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null
 const db = app ? getFirestore(app) : null
@@ -54,6 +66,7 @@ function mapDocToPosition(
           ? 'nothing'
           : 'scrap',
     item: typeof data.item === 'string' && data.item.length > 0 ? data.item : null,
+    nickname: typeof data.nickname === 'string' ? data.nickname : '',
     note: typeof data.note === 'string' ? data.note : '',
     createdAt: timestamp,
   }
@@ -115,6 +128,10 @@ export async function savePosition(position: PositionDraft) {
   })
 }
 
-export function isFirebaseReady() {
-  return hasFirebaseConfig
+export function getFirebaseStatus() {
+  return {
+    mode: db ? 'firestore' : 'local-storage',
+    hasFirebaseConfig,
+    missingFirebaseEnvKeys,
+  } as const
 }

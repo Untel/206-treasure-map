@@ -140,6 +140,16 @@ h2 {
   font-size: 1.9rem;
 }
 
+.locale-select {
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid rgba(69, 77, 52, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 249, 232, 0.88);
+  padding: 0.65rem 0.8rem;
+  color: var(--text);
+}
+
 .workspace {
   display: grid;
   gap: 20px;

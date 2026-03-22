@@ -6,6 +6,8 @@ import {
   type PositionRecord,
   type SuggestedZone,
 } from '../types/map'
+import { itemLabel } from '../lib/items'
+import type { Locale } from '../lib/i18n'
 import { zoneBounds } from '../lib/map'
 
 const CANVAS_WIDTH = 760
@@ -17,6 +19,7 @@ type MapCanvasProps = {
   positions: PositionRecord[]
   suggestion: SuggestedZone | null
   selectedPoint: { x: number; y: number }
+  locale: Locale
   onSelectPoint: (point: { x: number; y: number }) => void
 }
 
@@ -44,7 +47,7 @@ function drawGrid(ctx: CanvasRenderingContext2D) {
   ctx.restore()
 }
 
-function drawZones(ctx: CanvasRenderingContext2D, positions: PositionRecord[]) {
+function drawZones(ctx: CanvasRenderingContext2D, positions: PositionRecord[], locale: Locale) {
   positions
     .slice()
     .reverse()
@@ -71,12 +74,13 @@ function drawZones(ctx: CanvasRenderingContext2D, positions: PositionRecord[]) {
       ctx.fill()
 
       if (position.item) {
+        const label = itemLabel(position.item, locale)
         ctx.font = '600 12px "Trebuchet MS", sans-serif'
         ctx.lineWidth = 3
         ctx.strokeStyle = 'rgba(54, 42, 18, 0.75)'
-        ctx.strokeText(position.item, position.x * SCALE_X + 8, position.y * SCALE_Y - 8)
+        ctx.strokeText(label, position.x * SCALE_X + 8, position.y * SCALE_Y - 8)
         ctx.fillStyle = '#f5ea93'
-        ctx.fillText(position.item, position.x * SCALE_X + 8, position.y * SCALE_Y - 8)
+        ctx.fillText(label, position.x * SCALE_X + 8, position.y * SCALE_Y - 8)
       }
     })
 }
@@ -123,6 +127,7 @@ export function MapCanvas({
   positions,
   suggestion,
   selectedPoint,
+  locale,
   onSelectPoint,
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -148,9 +153,9 @@ export function MapCanvas({
 
     drawGrid(ctx)
     drawSuggestion(ctx, suggestion)
-    drawZones(ctx, positions)
+    drawZones(ctx, positions, locale)
     drawSelection(ctx, selectedPoint)
-  }, [positions, selectedPoint, suggestion])
+  }, [locale, positions, selectedPoint, suggestion])
 
   return (
     <canvas

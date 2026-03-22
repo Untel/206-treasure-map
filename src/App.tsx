@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MapCanvas } from './components/MapCanvas'
 import { isFirebaseReady, savePosition, subscribeToPositions } from './lib/firebase'
-import { ITEM_OPTIONS } from './lib/items'
+import { availableItems, itemLabel } from './lib/items'
+import { LOCALES, t, type Locale } from './lib/i18n'
 import {
   clampXCoordinate,
   clampYCoordinate,
@@ -16,8 +17,9 @@ const initialPoint = { x: MAP_WIDTH / 2, y: MAP_HEIGHT / 2 }
 function App() {
   const [positions, setPositions] = useState<PositionRecord[]>([])
   const [selectedPoint, setSelectedPoint] = useState(initialPoint)
+  const [locale, setLocale] = useState<Locale>('en')
   const [status, setStatus] = useState<'found' | 'empty'>('found')
-  const [item, setItem] = useState(ITEM_OPTIONS[0])
+  const [item, setItem] = useState('')
   const [note, setNote] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
@@ -29,12 +31,27 @@ function App() {
 
   const suggestion = useMemo(() => suggestNextZone(positions), [positions])
   const coverage = useMemo(() => coveragePercentage(positions), [positions])
+  const foundItems = useMemo(
+    () => positions.filter((position) => position.status === 'found').map((position) => position.item),
+    [positions],
+  )
+  const itemOptions = useMemo(() => availableItems(foundItems), [foundItems])
+
+  useEffect(() => {
+    if (status === 'empty') {
+      return
+    }
+
+    if (!itemOptions.some((option) => option.labels.en === item)) {
+      setItem(itemOptions[0]?.labels.en ?? '')
+    }
+  }, [item, itemOptions, status])
 
   const candidate: PositionDraft = {
     x: Math.round(clampXCoordinate(selectedPoint.x) * 10) / 10,
     y: Math.round(clampYCoordinate(selectedPoint.y) * 10) / 10,
     status,
-    item: status === 'found' ? item : null,
+    item: status === 'found' ? item || null : null,
     note: note.trim(),
   }
 
@@ -43,7 +60,7 @@ function App() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!candidateIsValid) {
-      setError('This 25x25 zone overlaps an existing position. Pick another point.')
+      setError(t(locale, 'overlapError'))
       return
     }
 
@@ -65,26 +82,37 @@ function App() {
     <main className="app-shell">
       <section className="hero-panel">
         <div>
-          <p className="eyebrow">509 x 1021 research board</p>
-          <h1>Map coverage tracker</h1>
-          <p className="hero-copy">
-            Register found objects and empty runs, block the 25x25 zone around each record, and
-            let the app propose the next high-value search square.
-          </p>
+          <p className="eyebrow">{t(locale, 'appTagline')}</p>
+          <h1>{t(locale, 'appTitle')}</h1>
+          <p className="hero-copy">{t(locale, 'appCopy')}</p>
         </div>
 
         <div className="summary-grid">
           <article className="summary-card">
-            <span>Recorded zones</span>
+            <span>{t(locale, 'recordedZones')}</span>
             <strong>{positions.length}</strong>
           </article>
           <article className="summary-card">
-            <span>Covered area</span>
+            <span>{t(locale, 'coveredArea')}</span>
             <strong>{coverage.toFixed(2)}%</strong>
           </article>
           <article className="summary-card">
-            <span>Firebase</span>
-            <strong>{isFirebaseReady() ? 'Live' : 'Local fallback'}</strong>
+            <span>{t(locale, 'firebase')}</span>
+            <strong>{isFirebaseReady() ? t(locale, 'live') : t(locale, 'localFallback')}</strong>
+          </article>
+          <article className="summary-card">
+            <span>{t(locale, 'locale')}</span>
+            <select
+              className="locale-select"
+              value={locale}
+              onChange={(event) => setLocale(event.target.value as Locale)}
+            >
+              {LOCALES.map((option) => (
+                <option key={option} value={option}>
+                  {option.toUpperCase()}
+                </option>
+              ))}
+            </select>
           </article>
         </div>
       </section>
@@ -93,8 +121,8 @@ function App() {
         <div className="map-panel">
           <div className="panel-header">
             <div>
-              <h2>Canvas map</h2>
-              <p>Click anywhere to position the next 25x25 research square.</p>
+              <h2>{t(locale, 'canvasMap')}</h2>
+              <p>{t(locale, 'clickHint')}</p>
             </div>
             {suggestion ? (
               <button
@@ -102,12 +130,13 @@ function App() {
                 type="button"
                 onClick={() => setSelectedPoint({ x: suggestion.x, y: suggestion.y })}
               >
-                Jump to suggested zone {suggestion.x}, {suggestion.y}
+                {t(locale, 'jumpToSuggestion')} {suggestion.x}, {suggestion.y}
               </button>
             ) : null}
           </div>
 
           <MapCanvas
+            locale={locale}
             positions={positions}
             suggestion={suggestion}
             selectedPoint={candidate}
@@ -117,15 +146,15 @@ function App() {
           <div className="legend">
             <span className="legend-item">
               <i className="swatch swatch-found" />
-              Found object
+              {t(locale, 'foundObject')}
             </span>
             <span className="legend-item">
               <i className="swatch swatch-empty" />
-              Scrap
+              {t(locale, 'scrap')}
             </span>
             <span className="legend-item">
               <i className="swatch swatch-suggested" />
-              Suggested next zone
+              {t(locale, 'suggestedZone')}
             </span>
           </div>
         </div>
@@ -134,14 +163,14 @@ function App() {
           <section className="card">
             <div className="panel-header">
               <div>
-                <h2>Register a position</h2>
-                <p>Coordinates are the center of the blocked 25x25 square.</p>
+                <h2>{t(locale, 'registerPosition')}</h2>
+                <p>{t(locale, 'registerHint')}</p>
               </div>
             </div>
 
             <form className="entry-form" onSubmit={handleSubmit}>
               <label>
-                X position
+                {t(locale, 'xPosition')}
                 <input
                   type="number"
                   min={0}
@@ -158,7 +187,7 @@ function App() {
               </label>
 
               <label>
-                Y position
+                {t(locale, 'yPosition')}
                 <input
                   type="number"
                   min={0}
@@ -175,63 +204,67 @@ function App() {
               </label>
 
               <label>
-                Result
-                <select value={status} onChange={(event) => setStatus(event.target.value as 'found' | 'empty')}>
-                  <option value="found">Found object</option>
-                  <option value="empty">Nothing found</option>
+                {t(locale, 'result')}
+                <select
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value as 'found' | 'empty')}
+                >
+                  <option value="found">{t(locale, 'foundObject')}</option>
+                  <option value="empty">{t(locale, 'scrap')}</option>
                 </select>
               </label>
 
               <label>
-                Item
+                {t(locale, 'item')}
                 <select
                   value={item}
                   onChange={(event) => setItem(event.target.value)}
-                  disabled={status === 'empty'}
+                  disabled={status === 'empty' || itemOptions.length === 0}
                 >
-                  {ITEM_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
+                  {itemOptions.map((option) => (
+                    <option key={option.id} value={option.labels.en}>
+                      {option.labels[locale]}
                     </option>
                   ))}
                 </select>
               </label>
 
               <label>
-                Note
+                {t(locale, 'note')}
                 <textarea
                   rows={3}
-                  placeholder="Optional context"
+                  placeholder={t(locale, 'notePlaceholder')}
                   value={note}
                   onChange={(event) => setNote(event.target.value)}
                 />
               </label>
 
-              <button className="primary-button" type="submit" disabled={isSaving || !candidateIsValid}>
-                {isSaving ? 'Saving...' : 'Save position'}
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={isSaving || !candidateIsValid || (status === 'found' && itemOptions.length === 0)}
+              >
+                {isSaving ? t(locale, 'saving') : t(locale, 'savePosition')}
               </button>
             </form>
 
             {!candidateIsValid ? (
-              <p className="warning-text">
-                This square overlaps an existing blocked area. Move at least 25 units away on both
-                axes.
-              </p>
+              <p className="warning-text">{t(locale, 'overlapHint')}</p>
+            ) : null}
+            {status === 'found' && itemOptions.length === 0 ? (
+              <p className="info-text">{t(locale, 'allFound')}</p>
             ) : null}
             {error ? <p className="error-text">{error}</p> : null}
             {!isFirebaseReady() ? (
-              <p className="info-text">
-                Add your Firebase keys to <code>.env.local</code> to switch from local browser
-                storage to live Firestore sync.
-              </p>
+              <p className="info-text">{t(locale, 'firebaseHint')}</p>
             ) : null}
           </section>
 
           <section className="card">
             <div className="panel-header">
               <div>
-                <h2>Next suggestion</h2>
-                <p>The search scans the map for a valid 25x25 square with the best clearance.</p>
+                <h2>{t(locale, 'nextSuggestion')}</h2>
+                <p>{t(locale, 'nextSuggestionHint')}</p>
               </div>
             </div>
 
@@ -240,35 +273,39 @@ function App() {
                 <strong>
                   ({suggestion.x}, {suggestion.y})
                 </strong>
-                <span>Clearance score: {suggestion.clearance.toFixed(1)}</span>
+                <span>
+                  {t(locale, 'clearanceScore')}: {suggestion.clearance.toFixed(1)}
+                </span>
               </div>
             ) : (
-              <p className="info-text">No valid 25x25 square remains.</p>
+              <p className="info-text">{t(locale, 'noValidSquare')}</p>
             )}
           </section>
 
           <section className="card history-card">
             <div className="panel-header">
               <div>
-                <h2>Latest positions</h2>
-                <p>Recent found objects and empty checks from Firestore.</p>
+                <h2>{t(locale, 'latestPositions')}</h2>
+                <p>{t(locale, 'latestPositionsHint')}</p>
               </div>
             </div>
 
             <div className="history-list">
               {positions.length === 0 ? (
-                <p className="info-text">No positions saved yet.</p>
+                <p className="info-text">{t(locale, 'noPositions')}</p>
               ) : (
                 positions.map((position) => (
                   <article className="history-item" key={position.id}>
                     <div>
-                      <strong>{position.item ?? 'Scrap'}</strong>
+                      <strong>
+                        {position.item ? itemLabel(position.item, locale) : t(locale, 'scrap')}
+                      </strong>
                       <p>
                         {position.x}, {position.y}
                       </p>
                     </div>
                     <span className={position.status === 'found' ? 'pill found' : 'pill empty'}>
-                      {position.status === 'found' ? 'Found' : 'Scrap'}
+                      {position.status === 'found' ? t(locale, 'found') : t(locale, 'scrap')}
                     </span>
                   </article>
                 ))

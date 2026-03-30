@@ -45,6 +45,7 @@ const missingFirebaseEnvKeys = Object.entries(firebaseEnvMap)
 
 const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null
 const db = app ? getFirestore(app) : null
+const POSITIONS_COLLECTION = 'positions_v2'
 const LOCAL_STORAGE_KEY = 'map-research-positions'
 
 function mapDocToPosition(
@@ -92,7 +93,7 @@ export function subscribeToPositions(
     return () => window.removeEventListener('storage', loadLocalPositions)
   }
 
-  const positionsQuery = query(collection(db, 'positions'), orderBy('createdAt', 'desc'))
+  const positionsQuery = query(collection(db, POSITIONS_COLLECTION), orderBy('createdAt', 'desc'))
 
   return onSnapshot(
     positionsQuery,
@@ -122,7 +123,7 @@ export async function savePosition(position: PositionDraft) {
     return
   }
 
-  await addDoc(collection(db, 'positions'), {
+  await addDoc(collection(db, POSITIONS_COLLECTION), {
     ...position,
     createdAt: serverTimestamp(),
   })

@@ -12,11 +12,13 @@ export type PositionRecord = {
   status: PositionStatus
   item: string | null
   nickname: string
+  playerId: string
   note: string
   createdAt: string
+  deletedAt?: string
 }
 
-export type PositionDraft = Omit<PositionRecord, 'id' | 'createdAt'>
+export type PositionDraft = Omit<PositionRecord, 'id' | 'createdAt' | 'deletedAt'>
 
 export type SuggestedZone = {
   x: number

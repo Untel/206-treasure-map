@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MapCanvas } from './components/MapCanvas'
-import { savePosition, subscribeToPositions } from './lib/firebase'
-import { availableItems, itemLabel } from './lib/items'
-import { LOCALES, t, type Locale } from './lib/i18n'
+import { LoginScreen } from './components/LoginScreen'
+import { loadSession, clearSession, type PlayerSession } from './lib/auth'
+import { detectLatestPeriod, getCollectionName, savePosition, softDeletePosition, subscribeToPositions } from './lib/firebase'
+import { availableItems, itemImageUrl, itemLabel } from './lib/items'
+import { LOCALE_FLAGS, LOCALES, t, type Locale } from './lib/i18n'
 import {
   clampXCoordinate,
   clampYCoordinate,
@@ -13,46 +15,107 @@ import {
 } from './lib/map'
 import { MAP_HEIGHT, MAP_WIDTH, type PositionDraft, type PositionRecord } from './types/map'
 
+const THEMES = ['s1', 's2', 's3', 's4'] as const
+
 const initialPoint = { x: Math.floor(MAP_WIDTH / 2), y: Math.floor(MAP_HEIGHT / 2) }
 
 function App() {
+  const [session, setSession] = useState<PlayerSession | null>(loadSession)
+  const [locale, setLocale] = useState<Locale>('en')
+
+  if (!session) {
+    return (
+      <LoginScreen
+        locale={locale}
+        onLocaleChange={setLocale}
+        onLogin={setSession}
+      />
+    )
+  }
+
+  return (
+    <MapApp
+      session={session}
+      locale={locale}
+      onLocaleChange={setLocale}
+      onLogout={() => {
+        clearSession()
+        setSession(null)
+      }}
+    />
+  )
+}
+
+type MapAppProps = {
+  session: PlayerSession
+  locale: Locale
+  onLocaleChange: (locale: Locale) => void
+  onLogout: () => void
+}
+
+function MapApp({ session, locale, onLocaleChange, onLogout }: MapAppProps) {
   const [positions, setPositions] = useState<PositionRecord[]>([])
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [selectedPoint, setSelectedPoint] = useState(initialPoint)
   const [xInput, setXInput] = useState(String(initialPoint.x))
   const [yInput, setYInput] = useState(String(initialPoint.y))
-  const [locale, setLocale] = useState<Locale>('en')
   const [status, setStatus] = useState<'found' | 'scrap' | 'nothing'>('nothing')
   const [item, setItem] = useState('')
-  const [nickname, setNickname] = useState('')
   const [note, setNote] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
+  const [theme, setTheme] = useState<(typeof THEMES)[number]>('s1')
+  const [period, setPeriod] = useState<number>(0) // 0 = not yet detected
+  const [maxPeriod, setMaxPeriod] = useState<number>(0)
 
+  // Detect the latest period for this theme + server
   useEffect(() => {
-    const unsubscribe = subscribeToPositions(setPositions, setError)
-    return unsubscribe
-  }, [])
+    setPeriod(0)
+    setMaxPeriod(0)
+    let cancelled = false
+    detectLatestPeriod(theme, session.server).then((latest) => {
+      if (cancelled) return
+      setMaxPeriod(latest)
+      setPeriod(latest)
+    })
+    return () => { cancelled = true }
+  }, [theme, session.server])
 
-  const suggestion = useMemo(() => suggestNextZone(positions), [positions])
-  const promisingAreas = useMemo(() => getPromisingAreas(positions), [positions])
-  const coverage = useMemo(() => coveragePercentage(positions), [positions])
-  const foundItems = useMemo(
-    () => positions.filter((position) => position.status === 'found').map((position) => position.item),
+  const collectionName = useMemo(
+    () => period > 0 ? getCollectionName(theme, period, session.server) : '',
+    [theme, period, session.server],
+  )
+
+  const activePositions = useMemo(
+    () => positions.filter((p) => !p.deletedAt),
     [positions],
   )
-  const itemOptions = useMemo(() => availableItems(foundItems), [foundItems])
+
+  useEffect(() => {
+    if (!collectionName) return
+    setPositions([])
+    setSelectedRecordId(null)
+    setError('')
+    const unsubscribe = subscribeToPositions(collectionName, setPositions, setError)
+    return unsubscribe
+  }, [collectionName])
+
+  const suggestion = useMemo(() => suggestNextZone(activePositions), [activePositions])
+  const promisingAreas = useMemo(() => getPromisingAreas(activePositions), [activePositions])
+  const coverage = useMemo(() => coveragePercentage(activePositions), [activePositions])
+  const foundItems = useMemo(
+    () => activePositions.filter((p) => p.status === 'found').map((p) => p.item),
+    [activePositions],
+  )
+  const itemOptions = useMemo(() => availableItems(foundItems, theme, period), [foundItems, theme, period])
   const selectedRecord = useMemo(
-    () => positions.find((position) => position.id === selectedRecordId) ?? null,
-    [positions, selectedRecordId],
+    () => activePositions.find((p) => p.id === selectedRecordId) ?? null,
+    [activePositions, selectedRecordId],
   )
 
   useEffect(() => {
-    if (status !== 'found') {
-      return
-    }
-
-    if (!itemOptions.some((option) => option.labels.en === item)) {
+    if (status !== 'found') return
+    if (!itemOptions.some((o) => o.labels.en === item)) {
       setItem(itemOptions[0]?.labels.en ?? '')
     }
   }, [item, itemOptions, status])
@@ -67,11 +130,12 @@ function App() {
     y: clampYCoordinate(selectedPoint.y),
     status,
     item: status === 'found' ? item || null : null,
-    nickname: nickname.trim(),
+    nickname: session.name,
+    playerId: session.playerId,
     note: note.trim(),
   }
 
-  const candidateIsValid = isPlacementValid(candidate, positions)
+  const candidateIsValid = isPlacementValid(candidate, activePositions)
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -84,7 +148,7 @@ function App() {
     try {
       setIsSaving(true)
       setError('')
-      await savePosition({
+      await savePosition(collectionName, {
         ...candidate,
         x: clampedPoint.x,
         y: clampedPoint.y,
@@ -99,56 +163,84 @@ function App() {
     }
   }
 
+  async function handleDelete(positionId: string) {
+    try {
+      setError('')
+      await softDeletePosition(collectionName, positionId, session.playerId)
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error ? deleteError.message : 'Unable to delete the position.',
+      )
+    }
+  }
+
   return (
     <main className="app-shell">
-      <section className="hero-panel">
-        <div className="hero-main">
-          <p className="eyebrow">{t(locale, 'appTagline')}</p>
-          <h1>{t(locale, 'appTitle')}</h1>
-          <p className="hero-copy">{t(locale, 'appCopy')}</p>
-
-          <div className="tutorial-inline">
-            <div className="tutorial-mark">?</div>
-            <div>
-              <p className="eyebrow">{t(locale, 'tutorialTitle')}</p>
-              <p className="tutorial-copy">{t(locale, 'tutorialStep')}</p>
-            </div>
-          </div>
+      {/* ── Header ── */}
+      <header className="app-header">
+        <div className="header-left">
+          <h1 className="header-title">{t(locale, 'appTitle')}</h1>
+          <span className="header-tagline">{t(locale, 'appTagline')}</span>
         </div>
+        <div className="header-right">
+          <span className="player-badge">
+            {session.name} <span className="player-level">Lv.{session.level}</span>
+          </span>
+          <button className="ghost-button" type="button" onClick={onLogout}>
+            {t(locale, 'logout')}
+          </button>
+        </div>
+      </header>
 
-        <div className="hero-side">
-          <div className="history-demo">
-            <span className="history-icon">?</span>
-            <span>{t(locale, 'tutorialWarning')}</span>
-          </div>
-
-          <div className="summary-grid compact">
-          <article className="summary-card">
-            <span>{t(locale, 'recordedZones')}</span>
-            <strong>{positions.length}</strong>
-          </article>
-          <article className="summary-card">
-            <span>{t(locale, 'coveredArea')}</span>
-            <strong>{coverage.toFixed(2)}%</strong>
-          </article>
-          <article className="summary-card">
-            <span>{t(locale, 'locale')}</span>
-            <select
-              className="locale-select"
-              value={locale}
-              onChange={(event) => setLocale(event.target.value as Locale)}
-            >
-              {LOCALES.map((option) => (
-                <option key={option} value={option}>
-                  {option.toUpperCase()}
-                </option>
+      {/* ── Toolbar ── */}
+      <div className="toolbar">
+        <div className="toolbar-group">
+          <label className="toolbar-label">
+            {t(locale, 'theme')}
+            <select value={theme} onChange={(e) => setTheme(e.target.value as typeof theme)}>
+              {THEMES.map((th) => (
+                <option key={th} value={th}>{th.toUpperCase()}</option>
               ))}
             </select>
-          </article>
+          </label>
+          <label className="toolbar-label">
+            {t(locale, 'period')}
+            <select value={period} onChange={(e) => setPeriod(Number(e.target.value))}>
+              {Array.from({ length: maxPeriod }, (_, i) => i + 1).map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </label>
+          <span className="server-badge">{session.server}</span>
         </div>
-        </div>
-      </section>
 
+        <div className="toolbar-group">
+          <div className="stat-pill">
+            <span>{t(locale, 'recordedZones')}</span>
+            <strong>{activePositions.length}</strong>
+          </div>
+          <div className="stat-pill">
+            <span>{t(locale, 'coveredArea')}</span>
+            <strong>{coverage.toFixed(1)}%</strong>
+          </div>
+          <label className="toolbar-label">
+            {t(locale, 'locale')}
+            <select value={locale} onChange={(e) => onLocaleChange(e.target.value as Locale)}>
+              {LOCALES.map((option) => (
+                <option key={option} value={option}>{LOCALE_FLAGS[option]} {option.toUpperCase()}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </div>
+
+      {/* ── Tutorial ── */}
+      <div className="tutorial-bar">
+        <span className="tutorial-icon">!</span>
+        <span>{t(locale, 'tutorialWarning')}</span>
+      </div>
+
+      {/* ── Workspace ── */}
       <section className="workspace">
         <div className="map-panel">
           <div className="panel-header">
@@ -162,14 +254,14 @@ function App() {
                 type="button"
                 onClick={() => setSelectedPoint({ x: suggestion.x, y: suggestion.y })}
               >
-                {t(locale, 'jumpToSuggestion')} {suggestion.x}, {suggestion.y}
+                {t(locale, 'jumpToSuggestion')} ({suggestion.x}, {suggestion.y})
               </button>
             ) : null}
           </div>
 
           <MapCanvas
             locale={locale}
-            positions={positions}
+            positions={activePositions}
             suggestion={suggestion}
             promisingAreas={promisingAreas}
             selectedPoint={candidate}
@@ -199,6 +291,7 @@ function App() {
         </div>
 
         <aside className="side-panel">
+          {/* ── Register ── */}
           <section className="card">
             <div className="panel-header">
               <div>
@@ -208,77 +301,60 @@ function App() {
             </div>
 
             <form className="entry-form" onSubmit={handleSubmit}>
-              <label>
-                {t(locale, 'xPosition')}
-                <input
-                  type="number"
-                  min={0}
-                  max={MAP_WIDTH}
-                  step={1}
-                  value={xInput}
-                  onChange={(event) => {
-                    setXInput(event.target.value)
-                    if (event.target.value === '') {
-                      return
-                    }
-
-                    const next = Number(event.target.value)
-                    if (Number.isFinite(next)) {
-                      setSelectedPoint((current) => ({
-                        ...current,
-                        x: next,
-                      }))
-                    }
-                  }}
-                  onBlur={() => {
-                    const next = clampXCoordinate(xInput === '' ? selectedPoint.x : Number(xInput))
-                    setSelectedPoint((current) => ({
-                      ...current,
-                      x: next,
-                    }))
-                    setXInput(String(next))
-                  }}
-                />
-              </label>
-
-              <label>
-                {t(locale, 'yPosition')}
-                <input
-                  type="number"
-                  min={0}
-                  max={MAP_HEIGHT}
-                  step={1}
-                  value={yInput}
-                  onChange={(event) => {
-                    setYInput(event.target.value)
-                    if (event.target.value === '') {
-                      return
-                    }
-
-                    const next = Number(event.target.value)
-                    if (Number.isFinite(next)) {
-                      setSelectedPoint((current) => ({
-                        ...current,
-                        y: next,
-                      }))
-                    }
-                  }}
-                  onBlur={() => {
-                    const next = clampYCoordinate(yInput === '' ? selectedPoint.y : Number(yInput))
-                    setSelectedPoint((current) => ({
-                      ...current,
-                      y: next,
-                    }))
-                    setYInput(String(next))
-                  }}
-                />
-              </label>
+              <div className="form-row">
+                <label>
+                  {t(locale, 'xPosition')}
+                  <input
+                    type="number"
+                    min={0}
+                    max={MAP_WIDTH}
+                    step={1}
+                    value={xInput}
+                    onChange={(e) => {
+                      setXInput(e.target.value)
+                      if (e.target.value === '') return
+                      const next = Number(e.target.value)
+                      if (Number.isFinite(next)) {
+                        setSelectedPoint((c) => ({ ...c, x: next }))
+                      }
+                    }}
+                    onBlur={() => {
+                      const next = clampXCoordinate(xInput === '' ? selectedPoint.x : Number(xInput))
+                      setSelectedPoint((c) => ({ ...c, x: next }))
+                      setXInput(String(next))
+                    }}
+                  />
+                </label>
+                <label>
+                  {t(locale, 'yPosition')}
+                  <input
+                    type="number"
+                    min={0}
+                    max={MAP_HEIGHT}
+                    step={1}
+                    value={yInput}
+                    onChange={(e) => {
+                      setYInput(e.target.value)
+                      if (e.target.value === '') return
+                      const next = Number(e.target.value)
+                      if (Number.isFinite(next)) {
+                        setSelectedPoint((c) => ({ ...c, y: next }))
+                      }
+                    }}
+                    onBlur={() => {
+                      const next = clampYCoordinate(yInput === '' ? selectedPoint.y : Number(yInput))
+                      setSelectedPoint((c) => ({ ...c, y: next }))
+                      setYInput(String(next))
+                    }}
+                  />
+                </label>
+              </div>
 
               <label>
                 {t(locale, 'result')}
                 <select
                   value={status}
-                  onChange={(event) => setStatus(event.target.value as 'found' | 'scrap' | 'nothing')}
+                  onChange={(e) => setStatus(e.target.value as 'found' | 'scrap' | 'nothing')}
                 >
                   <option value="found">{t(locale, 'foundObject')}</option>
                   <option value="scrap">{t(locale, 'scrap')}</option>
@@ -286,22 +362,10 @@ function App() {
                 </select>
               </label>
 
-              <label>
-                {t(locale, 'nickname')}
-                <input
-                  type="text"
-                  value={nickname}
-                  onChange={(event) => setNickname(event.target.value)}
-                  maxLength={32}
-                />
-              </label>
-
               {status === 'found' ? (
                 <label>
                   {t(locale, 'item')}
-                  <div
-                    className={`item-picker ${itemOptions.length === 0 ? 'is-disabled' : ''}`}
-                  >
+                  <div className={`item-picker ${itemOptions.length === 0 ? 'is-disabled' : ''}`}>
                     {itemOptions.map((option) => {
                       const selected = item === option.labels.en
                       return (
@@ -312,6 +376,13 @@ function App() {
                           onClick={() => setItem(option.labels.en)}
                           disabled={itemOptions.length === 0}
                         >
+                          <img
+                            className="item-card-img"
+                            src={itemImageUrl(option.id)}
+                            alt={option.labels[locale]}
+                            loading="lazy"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
                           <span className="item-card-label">{option.labels[locale]}</span>
                         </button>
                       )
@@ -323,10 +394,10 @@ function App() {
               <label>
                 {t(locale, 'note')}
                 <textarea
-                  rows={3}
+                  rows={2}
                   placeholder={t(locale, 'notePlaceholder')}
                   value={note}
-                  onChange={(event) => setNote(event.target.value)}
+                  onChange={(e) => setNote(e.target.value)}
                 />
               </label>
 
@@ -348,33 +419,11 @@ function App() {
             {error ? <p className="error-text">{error}</p> : null}
           </section>
 
-          <section className="card">
-            <div className="panel-header">
-              <div>
-                <h2>{t(locale, 'nextSuggestion')}</h2>
-                <p>{t(locale, 'nextSuggestionHint')}</p>
-              </div>
-            </div>
-
-            {suggestion ? (
-              <div className="suggestion-box">
-                <strong>
-                  ({suggestion.x}, {suggestion.y})
-                </strong>
-                <span>
-                  {t(locale, 'clearanceScore')}: {suggestion.clearance.toFixed(1)} / {suggestion.area}
-                </span>
-              </div>
-            ) : (
-              <p className="info-text">{t(locale, 'noValidSquare')}</p>
-            )}
-          </section>
-
+          {/* ── Selected Point ── */}
           <section className="card">
             <div className="panel-header">
               <div>
                 <h2>{t(locale, 'selectedPoint')}</h2>
-                <p>{t(locale, 'selectedPointHint')}</p>
               </div>
             </div>
 
@@ -391,30 +440,39 @@ function App() {
                   {selectedRecord.x}, {selectedRecord.y}
                 </span>
                 {selectedRecord.nickname ? (
-                  <span>
+                  <span className="record-meta">
                     {t(locale, 'recordedBy')}: {selectedRecord.nickname}
                   </span>
                 ) : null}
-                {selectedRecord.note ? <span>{selectedRecord.note}</span> : null}
+                {selectedRecord.note ? <span className="record-note">{selectedRecord.note}</span> : null}
+                {selectedRecord.playerId === session.playerId && (
+                  <button
+                    className="delete-button"
+                    type="button"
+                    onClick={() => handleDelete(selectedRecord.id)}
+                  >
+                    {t(locale, 'deletePosition')}
+                  </button>
+                )}
               </div>
             ) : (
               <p className="info-text">{t(locale, 'selectedPointHint')}</p>
             )}
           </section>
 
+          {/* ── History ── */}
           <section className="card history-card">
             <div className="panel-header">
               <div>
                 <h2>{t(locale, 'latestPositions')}</h2>
-                <p>{t(locale, 'latestPositionsHint')}</p>
               </div>
             </div>
 
             <div className="history-list">
-              {positions.length === 0 ? (
+              {activePositions.length === 0 ? (
                 <p className="info-text">{t(locale, 'noPositions')}</p>
               ) : (
-                positions.map((position) => (
+                activePositions.map((position) => (
                   <article
                     className={`history-item ${selectedRecordId === position.id ? 'is-selected' : ''}`}
                     key={position.id}
@@ -423,7 +481,7 @@ function App() {
                       setSelectedPoint({ x: position.x, y: position.y })
                     }}
                   >
-                    <div>
+                    <div className="history-content">
                       <strong>
                         {position.item
                           ? itemLabel(position.item, locale)
@@ -432,21 +490,34 @@ function App() {
                             : t(locale, 'nothingFound')}
                       </strong>
                       {position.nickname ? (
-                        <p className="history-meta">
-                          {t(locale, 'recordedBy')}: {position.nickname}
-                        </p>
+                        <p className="history-meta">{position.nickname}</p>
                       ) : null}
-                      <p>
+                      <p className="history-coords">
                         {position.x}, {position.y}
                       </p>
                     </div>
-                    <span className={`pill ${position.status}`}>
-                      {position.status === 'found'
-                        ? t(locale, 'found')
-                        : position.status === 'scrap'
-                          ? t(locale, 'scrap')
-                          : t(locale, 'nothingFound')}
-                    </span>
+                    <div className="history-actions">
+                      <span className={`pill ${position.status}`}>
+                        {position.status === 'found'
+                          ? t(locale, 'found')
+                          : position.status === 'scrap'
+                            ? t(locale, 'scrap')
+                            : t(locale, 'nothingFound')}
+                      </span>
+                      {position.playerId === session.playerId && (
+                        <button
+                          className="delete-icon-button"
+                          type="button"
+                          title={t(locale, 'deletePosition')}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDelete(position.id)
+                          }}
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
                   </article>
                 ))
               )}

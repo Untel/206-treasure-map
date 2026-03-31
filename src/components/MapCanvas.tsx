@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   MAP_HEIGHT,
   MAP_WIDTH,
@@ -7,7 +7,7 @@ import {
   type PositionRecord,
   type SuggestedZone,
 } from '../types/map'
-import { itemLabel } from '../lib/items'
+import { itemImageUrl, resolveItemDefinition } from '../lib/items'
 import { t, type Locale } from '../lib/i18n'
 import { zoneBounds } from '../lib/map'
 
@@ -32,6 +32,21 @@ type MapCanvasProps = {
   locale: Locale
   onSelectPoint: (point: { x: number; y: number }) => void
   onSelectRecord: (record: PositionRecord | null) => void
+}
+
+// Image cache for item thumbnails on the map
+const imageCache = new Map<string, HTMLImageElement>()
+
+function getItemImage(itemId: string, onLoad: () => void): HTMLImageElement | null {
+  const cached = imageCache.get(itemId)
+  if (cached) {
+    return cached.complete ? cached : null
+  }
+  const img = new Image()
+  img.src = itemImageUrl(itemId)
+  img.onload = onLoad
+  imageCache.set(itemId, img)
+  return null
 }
 
 function drawGrid(ctx: CanvasRenderingContext2D) {
@@ -97,8 +112,8 @@ function createHatchPattern(
 function drawZones(
   ctx: CanvasRenderingContext2D,
   positions: PositionRecord[],
-  locale: Locale,
   selectedRecordId: string | null,
+  onImageLoad: () => void,
 ) {
   const hatchPattern = createHatchPattern(ctx, 'rgba(82, 70, 48, 0.3)')
   positions
@@ -106,45 +121,62 @@ function drawZones(
     .reverse()
     .forEach((position) => {
       const bounds = zoneBounds(position.x, position.y)
-      const x = bounds.left * SCALE_X
-      const y = bounds.top * SCALE_Y
+      const zx = bounds.left * SCALE_X
+      const zy = bounds.top * SCALE_Y
       const width = ZONE_SIZE * SCALE_X
       const height = ZONE_SIZE * SCALE_Y
+      const isSelected = position.id === selectedRecordId
       const markerFill =
         position.status === 'found'
           ? 'rgba(60, 174, 55, 0.95)'
           : position.status === 'scrap'
             ? 'rgba(110, 110, 110, 0.95)'
             : 'rgba(185, 44, 44, 0.95)'
-      const zoneStroke = position.id === selectedRecordId ? '#1e4f45' : 'rgba(82, 70, 48, 0.55)'
+      const zoneStroke = isSelected ? '#1e4f45' : 'rgba(82, 70, 48, 0.55)'
 
+      // Zone background
       ctx.fillStyle = 'rgba(255, 250, 239, 0.2)'
-      ctx.fillRect(x, y, width, height)
+      ctx.fillRect(zx, zy, width, height)
       if (hatchPattern) {
         ctx.fillStyle = hatchPattern
-        ctx.fillRect(x, y, width, height)
+        ctx.fillRect(zx, zy, width, height)
       }
       ctx.strokeStyle = zoneStroke
-      ctx.lineWidth = position.id === selectedRecordId ? 2.5 : 1.6
-      ctx.strokeRect(x, y, width, height)
+      ctx.lineWidth = isSelected ? 2.5 : 1.6
+      ctx.strokeRect(zx, zy, width, height)
 
+      // Try to draw item image for found items
+      if (position.status === 'found' && position.item) {
+        const def = resolveItemDefinition(position.item)
+        if (def) {
+          const img = getItemImage(def.id, onImageLoad)
+          if (img) {
+            // Draw image centered on zone, slightly larger than zone for visibility
+            const imgSize = Math.max(width, height) * 1.3
+            const ix = position.x * SCALE_X - imgSize / 2
+            const iy = position.y * SCALE_Y - imgSize / 2
+            ctx.save()
+            ctx.globalAlpha = isSelected ? 1 : 0.9
+            ctx.drawImage(img, ix, iy, imgSize, imgSize)
+            ctx.globalAlpha = 1
+            // Draw a subtle border around the image
+            ctx.strokeStyle = isSelected ? '#1e4f45' : 'rgba(60, 174, 55, 0.6)'
+            ctx.lineWidth = isSelected ? 2 : 1
+            ctx.strokeRect(ix, iy, imgSize, imgSize)
+            ctx.restore()
+            return // skip the dot marker for found items with images
+          }
+        }
+      }
+
+      // Dot marker (for scrap/nothing, or found without loaded image)
       ctx.beginPath()
       ctx.fillStyle = markerFill
-      ctx.arc(position.x * SCALE_X, position.y * SCALE_Y, position.id === selectedRecordId ? 5.5 : 4.2, 0, Math.PI * 2)
+      ctx.arc(position.x * SCALE_X, position.y * SCALE_Y, isSelected ? 5.5 : 4.2, 0, Math.PI * 2)
       ctx.fill()
       ctx.strokeStyle = 'rgba(255, 248, 231, 0.8)'
       ctx.lineWidth = 1.2
       ctx.stroke()
-
-      if (position.item) {
-        const label = itemLabel(position.item, locale)
-        ctx.font = '600 12px "Trebuchet MS", sans-serif'
-        ctx.lineWidth = 3
-        ctx.strokeStyle = 'rgba(54, 42, 18, 0.75)'
-        ctx.strokeText(label, position.x * SCALE_X + 8, position.y * SCALE_Y - 8)
-        ctx.fillStyle = '#f5ea93'
-        ctx.fillText(label, position.x * SCALE_X + 8, position.y * SCALE_Y - 8)
-      }
     })
 }
 
@@ -230,6 +262,7 @@ export function MapCanvas({
   onSelectRecord,
 }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [imageLoadCount, setImageLoadCount] = useState(0)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -251,7 +284,7 @@ export function MapCanvas({
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
 
     drawGrid(ctx)
-    drawZones(ctx, positions, locale, selectedRecordId)
+    drawZones(ctx, positions, selectedRecordId, () => setImageLoadCount((c) => c + 1))
     drawPromisingAreas(ctx, promisingAreas, locale)
     if (suggestion) {
       ctx.save()
@@ -265,7 +298,7 @@ export function MapCanvas({
       ctx.restore()
     }
     drawSelection(ctx, selectedPoint)
-  }, [locale, positions, promisingAreas, selectedPoint, selectedRecordId, suggestion])
+  }, [locale, positions, promisingAreas, selectedPoint, selectedRecordId, suggestion, imageLoadCount])
 
   return (
     <canvas

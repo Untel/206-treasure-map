@@ -2,12 +2,16 @@ import { initializeApp } from 'firebase/app'
 import {
   addDoc,
   collection,
+  doc,
+  getDocs,
   getFirestore,
+  limit,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   Timestamp,
+  updateDoc,
 } from 'firebase/firestore'
 import type { PositionDraft, PositionRecord } from '../types/map'
 
@@ -39,14 +43,34 @@ const firebaseConfig: FirebaseConfig = {
 }
 
 const hasFirebaseConfig = Object.values(firebaseConfig).every(Boolean)
-const missingFirebaseEnvKeys = Object.entries(firebaseEnvMap)
-  .filter(([, value]) => !value)
-  .map(([key]) => key)
 
 const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null
 const db = app ? getFirestore(app) : null
-const POSITIONS_COLLECTION = 'positions_v2'
-const LOCAL_STORAGE_KEY = 'map-research-positions'
+
+export function getCollectionName(theme: string, period: number, server: string): string {
+  return `${theme}_${period}_${server}`
+}
+
+/**
+ * Finds the highest period (1–4) that has at least one document
+ * for the given theme + server. Returns 1 as fallback.
+ */
+export async function detectLatestPeriod(
+  theme: string,
+  server: string,
+  maxPeriod = 4,
+): Promise<number> {
+  if (!db) return 1
+
+  for (let p = maxPeriod; p >= 1; p--) {
+    const name = getCollectionName(theme, p, server)
+    const q = query(collection(db, name), limit(1))
+    const snapshot = await getDocs(q)
+    if (!snapshot.empty) return p
+  }
+
+  return 1
+}
 
 function mapDocToPosition(
   id: string,
@@ -55,6 +79,10 @@ function mapDocToPosition(
   const createdAt = data.createdAt
   const timestamp =
     createdAt instanceof Timestamp ? createdAt.toDate().toISOString() : new Date().toISOString()
+
+  const deletedAt = data.deletedAt
+  const deletedTimestamp =
+    deletedAt instanceof Timestamp ? deletedAt.toDate().toISOString() : undefined
 
   return {
     id,
@@ -68,19 +96,23 @@ function mapDocToPosition(
           : 'scrap',
     item: typeof data.item === 'string' && data.item.length > 0 ? data.item : null,
     nickname: typeof data.nickname === 'string' ? data.nickname : '',
+    playerId: typeof data.playerId === 'string' ? data.playerId : '',
     note: typeof data.note === 'string' ? data.note : '',
     createdAt: timestamp,
+    deletedAt: deletedTimestamp,
   }
 }
 
 export function subscribeToPositions(
+  collectionName: string,
   onData: (positions: PositionRecord[]) => void,
   onError: (message: string) => void,
 ) {
   if (!db) {
+    const localKey = `map-positions-${collectionName}`
     const loadLocalPositions = () => {
       try {
-        const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY)
+        const raw = window.localStorage.getItem(localKey)
         const parsed = raw ? (JSON.parse(raw) as PositionRecord[]) : []
         onData(parsed)
       } catch (error) {
@@ -93,7 +125,7 @@ export function subscribeToPositions(
     return () => window.removeEventListener('storage', loadLocalPositions)
   }
 
-  const positionsQuery = query(collection(db, POSITIONS_COLLECTION), orderBy('createdAt', 'desc'))
+  const positionsQuery = query(collection(db, collectionName), orderBy('createdAt', 'desc'))
 
   return onSnapshot(
     positionsQuery,
@@ -109,9 +141,10 @@ export function subscribeToPositions(
   )
 }
 
-export async function savePosition(position: PositionDraft) {
+export async function savePosition(collectionName: string, position: PositionDraft) {
   if (!db) {
-    const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY)
+    const localKey = `map-positions-${collectionName}`
+    const raw = window.localStorage.getItem(localKey)
     const existing = raw ? (JSON.parse(raw) as PositionRecord[]) : []
     const nextRecord: PositionRecord = {
       ...position,
@@ -119,20 +152,37 @@ export async function savePosition(position: PositionDraft) {
       createdAt: new Date().toISOString(),
     }
 
-    window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([nextRecord, ...existing]))
+    window.localStorage.setItem(localKey, JSON.stringify([nextRecord, ...existing]))
     return
   }
 
-  await addDoc(collection(db, POSITIONS_COLLECTION), {
+  await addDoc(collection(db, collectionName), {
     ...position,
     createdAt: serverTimestamp(),
   })
 }
 
-export function getFirebaseStatus() {
-  return {
-    mode: db ? 'firestore' : 'local-storage',
-    hasFirebaseConfig,
-    missingFirebaseEnvKeys,
-  } as const
+export async function softDeletePosition(
+  collectionName: string,
+  positionId: string,
+  playerId: string,
+) {
+  if (!db) {
+    const localKey = `map-positions-${collectionName}`
+    const raw = window.localStorage.getItem(localKey)
+    const existing = raw ? (JSON.parse(raw) as PositionRecord[]) : []
+    const updated = existing.map((p) =>
+      p.id === positionId && p.playerId === playerId
+        ? { ...p, deletedAt: new Date().toISOString() }
+        : p,
+    )
+    window.localStorage.setItem(localKey, JSON.stringify(updated))
+    return
+  }
+
+  const docRef = doc(db, collectionName, positionId)
+  await updateDoc(docRef, {
+    deletedAt: serverTimestamp(),
+    deletedBy: playerId,
+  })
 }

@@ -2,6 +2,12 @@ export const LOCALES = ['en', 'ja', 'vi'] as const
 
 export type Locale = (typeof LOCALES)[number]
 
+export const LOCALE_FLAGS: Record<Locale, string> = {
+  en: '🇬🇧',
+  ja: '🇯🇵',
+  vi: '🇻🇳',
+}
+
 type Messages = Record<string, string>
 
 export const UI_MESSAGES: Record<Locale, Messages> = {
@@ -56,6 +62,21 @@ export const UI_MESSAGES: Record<Locale, Messages> = {
     found: 'Found',
     locale: 'Language',
     recordedBy: 'Recorded by',
+    loginTitle: 'Treasure Map',
+    loginSubtitle: 'Enter your Player ID to access the map',
+    loginExplain: 'Your player ID lets us detect your server automatically, authenticate your submissions, and keep each server\'s map separate so data stays accurate.',
+    loginPlaceholder: 'Player ID',
+    loginConnect: 'Connect',
+    loginConnecting: 'Connecting...',
+    loginError: 'Unable to find player. Check your ID and try again.',
+    logout: 'Logout',
+    theme: 'Theme',
+    period: 'Period',
+    server: 'Server',
+    player: 'Player',
+    deletePosition: 'Delete',
+    deleteConfirm: 'Delete this position?',
+    deleting: 'Deleting...',
   },
   ja: {
     appTagline: '509 x 1021 調査マップ',
@@ -108,6 +129,21 @@ export const UI_MESSAGES: Record<Locale, Messages> = {
     found: '発見済み',
     locale: '言語',
     recordedBy: '記録者',
+    loginTitle: 'トレジャーマップ',
+    loginSubtitle: 'プレイヤーIDを入力してマップにアクセス',
+    loginExplain: 'プレイヤーIDでサーバーを自動検出し、投稿を認証して、サーバー間のデータ混在を防ぎます。',
+    loginPlaceholder: 'プレイヤーID',
+    loginConnect: '接続',
+    loginConnecting: '接続中...',
+    loginError: 'プレイヤーが見つかりません。IDを確認して再試行してください。',
+    logout: 'ログアウト',
+    theme: 'テーマ',
+    period: '期間',
+    server: 'サーバー',
+    player: 'プレイヤー',
+    deletePosition: '削除',
+    deleteConfirm: 'この位置を削除しますか？',
+    deleting: '削除中...',
   },
   vi: {
     appTagline: 'Bản đồ nghiên cứu 509 x 1021',
@@ -160,6 +196,21 @@ export const UI_MESSAGES: Record<Locale, Messages> = {
     found: 'Đã tìm thấy',
     locale: 'Ngôn ngữ',
     recordedBy: 'Ghi bởi',
+    loginTitle: 'Bản đồ kho báu',
+    loginSubtitle: 'Nhập ID người chơi để truy cập bản đồ',
+    loginExplain: 'ID người chơi giúp tự động phát hiện máy chủ, xác thực dữ liệu bạn gửi, và giữ bản đồ riêng cho từng máy chủ.',
+    loginPlaceholder: 'ID người chơi',
+    loginConnect: 'Kết nối',
+    loginConnecting: 'Đang kết nối...',
+    loginError: 'Không tìm thấy người chơi. Kiểm tra ID và thử lại.',
+    logout: 'Đăng xuất',
+    theme: 'Chủ đề',
+    period: 'Giai đoạn',
+    server: 'Máy chủ',
+    player: 'Người chơi',
+    deletePosition: 'Xóa',
+    deleteConfirm: 'Xóa vị trí này?',
+    deleting: 'Đang xóa...',
   },
 }
 

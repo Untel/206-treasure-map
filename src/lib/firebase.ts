@@ -49,7 +49,6 @@ const db = app ? getFirestore(app) : null;
 
 const SERVER_CLUSTERS: Record<string, string> = {
   S10205: "S10206",
-  S10196: "S10206",
   S10198: "S10206",
   S10197: "S10206",
 };

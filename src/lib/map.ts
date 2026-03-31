@@ -10,10 +10,10 @@ import {
 
 const SUGGESTION_STEP = 5
 const TOP_SUGGESTION_COUNT = 5
-const MIN_X = ZONE_RADIUS
-const MAX_X = MAP_WIDTH - ZONE_RADIUS
-const MIN_Y = ZONE_RADIUS
-const MAX_Y = MAP_HEIGHT - ZONE_RADIUS
+const MIN_X = 0
+const MAX_X = MAP_WIDTH - 1
+const MIN_Y = 0
+const MAX_Y = MAP_HEIGHT - 1
 const PROMISING_AREA_MIN_DISTANCE = ZONE_SIZE * 3
 
 export function clampXCoordinate(value: number) {
@@ -44,14 +44,7 @@ export function isPlacementValid(
   candidate: Pick<PositionRecord, 'x' | 'y'>,
   positions: Array<Pick<PositionRecord, 'x' | 'y'>>,
 ) {
-  const bounds = zoneBounds(candidate.x, candidate.y)
-  const inBounds =
-    bounds.left >= 0 &&
-    bounds.top >= 0 &&
-    bounds.right <= MAP_WIDTH &&
-    bounds.bottom <= MAP_HEIGHT
-
-  if (!inBounds) {
+  if (candidate.x < MIN_X || candidate.x > MAX_X || candidate.y < MIN_Y || candidate.y > MAX_Y) {
     return false
   }
 

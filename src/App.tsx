@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { MapCanvas } from './components/MapCanvas'
 import { LoginScreen } from './components/LoginScreen'
 import { loadSession, clearSession, type PlayerSession } from './lib/auth'
-import { detectLatestPeriod, getCollectionName, savePosition, softDeletePosition, subscribeToPositions } from './lib/firebase'
+import { detectLatestPeriod, getCollectionName, resolveServer, savePosition, softDeletePosition, subscribeToPositions } from './lib/firebase'
 import { availableItems, itemImageUrl, itemLabel } from './lib/items'
 import { LOCALE_FLAGS, LOCALES, t, type Locale } from './lib/i18n'
 import {
@@ -211,7 +211,7 @@ function MapApp({ session, locale, onLocaleChange, onLogout }: MapAppProps) {
               ))}
             </select>
           </label>
-          <span className="server-badge">{session.server}</span>
+          <span className="server-badge">{resolveServer(session.server)}</span>
         </div>
 
         <div className="toolbar-group">

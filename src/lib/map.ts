@@ -14,8 +14,6 @@ const MIN_X = ZONE_RADIUS
 const MAX_X = MAP_WIDTH - ZONE_RADIUS
 const MIN_Y = ZONE_RADIUS
 const MAX_Y = MAP_HEIGHT - ZONE_RADIUS
-const CENTER_X = Math.floor(MAP_WIDTH / 2)
-const CENTER_Y = Math.floor(MAP_HEIGHT / 2)
 const PROMISING_AREA_MIN_DISTANCE = ZONE_SIZE * 3
 
 export function clampXCoordinate(value: number) {
@@ -75,26 +73,11 @@ function nearestPositionDistance(
   )
 }
 
-function borderDistance(candidate: Pick<PositionRecord, 'x' | 'y'>) {
-  const bounds = zoneBounds(candidate.x, candidate.y)
-
-  return Math.min(
-    bounds.left,
-    bounds.top,
-    MAP_WIDTH - bounds.right,
-    MAP_HEIGHT - bounds.bottom,
-  )
-}
-
 function nearestConstraintDistance(
   candidate: Pick<PositionRecord, 'x' | 'y'>,
   positions: Array<Pick<PositionRecord, 'x' | 'y'>>,
 ) {
-  return Math.min(nearestPositionDistance(candidate, positions), borderDistance(candidate))
-}
-
-function centerBias(candidate: Pick<PositionRecord, 'x' | 'y'>) {
-  return Math.hypot(candidate.x - CENTER_X, candidate.y - CENTER_Y)
+  return nearestPositionDistance(candidate, positions)
 }
 
 function buildPromisingWindow(zone: SuggestedZone, index: number): PromisingArea {
@@ -180,7 +163,7 @@ function analyzePromisingAreas(positions: PositionRecord[]) {
           y: MIN_Y + componentRow * SUGGESTION_STEP,
         }
         const clearance = nearestConstraintDistance(candidate, positions)
-        const score = componentArea * 0.2 + clearance * 4 - centerBias(candidate) * 0.04
+        const score = componentArea * 0.3 + clearance * 3
 
         candidates.push({ ...candidate, score, clearance, area: componentArea })
       }

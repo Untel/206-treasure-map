@@ -42,12 +42,12 @@ export async function fetchPlayerInfo(playerId: string): Promise<PlayerSession> 
 }
 
 export function saveSession(session: PlayerSession): void {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session))
 }
 
 export function loadSession(): PlayerSession | null {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY)
+    const raw = localStorage.getItem(SESSION_KEY)
     if (!raw) return null
     return JSON.parse(raw) as PlayerSession
   } catch {
@@ -56,5 +56,5 @@ export function loadSession(): PlayerSession | null {
 }
 
 export function clearSession(): void {
-  sessionStorage.removeItem(SESSION_KEY)
+  localStorage.removeItem(SESSION_KEY)
 }

@@ -17,8 +17,8 @@ const app = initializeApp({
 
 const db = getFirestore(app);
 
-const SOURCE = "s1_1_S10198";
-const TARGET = "s1_2_S10206";
+const SOURCE = "positions";
+const TARGET = "s1_1_S10206";
 
 async function merge() {
   // Read all docs from source

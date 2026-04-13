@@ -248,6 +248,19 @@ function drawSelection(ctx: CanvasRenderingContext2D, point: { x: number; y: num
   ctx.moveTo(0, point.y * SCALE_Y)
   ctx.lineTo(CANVAS_WIDTH, point.y * SCALE_Y)
   ctx.stroke()
+
+  const bounds = zoneBounds(point.x, point.y)
+  const zx = bounds.left * SCALE_X
+  const zy = bounds.top * SCALE_Y
+  const w = ZONE_SIZE * SCALE_X
+  const h = ZONE_SIZE * SCALE_Y
+  ctx.strokeStyle = 'rgba(30, 79, 69, 0.7)'
+  ctx.lineWidth = 2
+  ctx.setLineDash([4, 3])
+  ctx.strokeRect(zx, zy, w, h)
+  ctx.fillStyle = 'rgba(255, 250, 239, 0.15)'
+  ctx.fillRect(zx, zy, w, h)
+
   ctx.restore()
 }
 

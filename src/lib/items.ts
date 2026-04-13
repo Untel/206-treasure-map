@@ -15,6 +15,7 @@ export function poolKey(theme: string, period: number): string {
 
 // S1 periods 1 & 2 confirmed pool
 const S1_P12 = ['s1_1', 's1_2']
+const S1_P3 = ['s1_3']
 
 export const ITEM_DEFINITIONS: ItemDefinition[] = [
   {
@@ -137,114 +138,120 @@ export const ITEM_DEFINITIONS: ItemDefinition[] = [
     aliases: ['Stone Pillar', 'Pilier en Pierre'],
     pools: S1_P12,
   },
-  // ── Items from other themes/periods (no confirmed pool yet) ──
+  // ── S1 period 3 confirmed pool ──
+  {
+    id: 'unknown-s3-mythic',
+    labels: { en: 'Unknown s3 mythic', ja: '不明S3ミシック', vi: 'S3 Thần Thoại Chưa Rõ' },
+    aliases: ['Unknown s3 mythic', '???'],
+    pools: S1_P3,
+  },
   {
     id: 'sphinx-statue',
     labels: { en: 'Sphinx Statue', ja: 'スフィンクス像', vi: 'Tượng Nhân Sư' },
     aliases: ['Sphinx Statue', 'Statue du Sphinx'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'pyramid',
     labels: { en: 'Pyramid', ja: 'ピラミッド', vi: 'Kim Tự Tháp' },
     aliases: ['Pyramid', 'Pyramide'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'water-wheel',
     labels: { en: 'Water Wheel', ja: '水車', vi: 'Bánh Xe Nước' },
     aliases: ['Water Wheel', 'Roue à Eau', 'Broken Wheel'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'sandstorm-pavilion-a',
     labels: { en: 'Sandstorm Pavilion A', ja: '砂嵐のパビリオン A', vi: 'Nhà Mái Bão Cát A' },
     aliases: ['Sandstorm Pavilion A', 'Pavillon - Tempête de Sab A'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'sandstorm-pavilion-b',
     labels: { en: 'Sandstorm Pavilion B', ja: '砂嵐のパビリオン B', vi: 'Nhà Mái Bão Cát B' },
     aliases: ['Sandstorm Pavilion B', 'Pavillon - Tempête de Sab B'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'colored-ore',
     labels: { en: 'Colored Ore', ja: '彩色鉱石', vi: 'Quặng Màu' },
     aliases: ['Colored Ore', 'Minerai Coloré'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'sandstorm-castle',
     labels: { en: 'Sandstorm Castle', ja: '砂嵐の城', vi: 'Lâu Đài Bão Cát' },
     aliases: ['Sandstorm Castle', 'Château Tempête de Sabl'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'sandstorm-bunker',
     labels: { en: 'Sandstorm Bunker', ja: '砂嵐のバンカー', vi: 'Boong-ke Bão Cát' },
     aliases: ['Sandstorm Bunker', 'Bunker anti-Tempête de S'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'fern-cluster',
     labels: { en: 'Fern Cluster', ja: 'シダの群生', vi: 'Cụm Dương Xỉ' },
     aliases: ['Fern Cluster', 'Amas de Fougère'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'eroded-arch-i',
     labels: { en: 'Eroded Arch I', ja: '風化したアーチ I', vi: 'Cổng Vòm Bào Mòn I' },
     aliases: ['Eroded Arch I', 'Porche Érodée I', 'Weathered Porch I'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'eroded-arch-ii',
     labels: { en: 'Eroded Arch II', ja: '風化したアーチ II', vi: 'Cổng Vòm Bào Mòn II' },
     aliases: ['Eroded Arch II', 'Porche Érodée II', 'Weathered Porch II'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'eroded-arch-iii',
     labels: { en: 'Eroded Arch III', ja: '風化したアーチ III', vi: 'Cổng Vòm Bào Mòn III' },
     aliases: ['Eroded Arch III', 'Porche Érodée III', 'Weathered Porch III'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'eroded-fountain',
     labels: { en: 'Eroded Fountain', ja: '風化した噴水', vi: 'Đài Phun Bị Bào Mòn' },
     aliases: ['Eroded Fountain', 'Fontaine Érodée', 'Weathered Fountain'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'eroded-altar',
     labels: { en: 'Eroded Altar', ja: '風化した祭壇', vi: 'Bệ Thờ Bị Bào Mòn' },
     aliases: ['Eroded Altar', 'Autel Érodée', 'Weathered Altar'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'mineral-cave',
     labels: { en: 'Mineral Cave', ja: '鉱石の洞窟', vi: 'Hang Khoáng Sản' },
     aliases: ['Mineral Cave', 'Grotte Minérale'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'ruby-mine',
     labels: { en: 'Ruby Mine', ja: 'ルビー鉱山', vi: 'Mỏ Hồng Ngọc' },
     aliases: ['Ruby Mine', 'Mine de Rubis', 'Ruby Vein'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'stone-mine',
     labels: { en: 'Stone Mine', ja: '石鉱山', vi: 'Mỏ Đá' },
     aliases: ['Stone Mine', 'Mine de Pierre', 'Stone Vein'],
-    pools: [],
+    pools: S1_P3,
   },
   {
     id: 'eroded-stone',
     labels: { en: 'Eroded Stone', ja: '風化した石', vi: 'Đá Bị Bào Mòn' },
     aliases: ['Eroded Stone', 'Pierre Érodée', 'Weathered Stone'],
-    pools: [],
+    pools: S1_P3,
   },
 ]
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { MapCanvas } from './components/MapCanvas'
 import { LoginScreen } from './components/LoginScreen'
 import { loadSession, clearSession, type PlayerSession } from './lib/auth'
@@ -65,21 +65,28 @@ function MapApp({ session, locale, onLocaleChange, onLogout }: MapAppProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [theme, setTheme] = useState<(typeof THEMES)[number]>('s1')
-  const [period, setPeriod] = useState<number>(0) // 0 = not yet detected
-  const [maxPeriod, setMaxPeriod] = useState<number>(0)
+  const MAX_PERIODS = 4
 
-  // Detect the latest period for this theme + server
+  const [period, setPeriodRaw] = useState<number>(() => {
+    const saved = localStorage.getItem('map-selected-period')
+    const n = saved ? Number(saved) : 0
+    return n >= 1 && n <= MAX_PERIODS ? n : 0
+  })
+
+  const setPeriod = useCallback((p: number) => {
+    setPeriodRaw(p)
+    if (p >= 1) localStorage.setItem('map-selected-period', String(p))
+  }, [])
+
+  // If no saved preference, detect the latest period
   useEffect(() => {
-    setPeriod(0)
-    setMaxPeriod(0)
+    if (period >= 1) return
     let cancelled = false
     detectLatestPeriod(theme, session.server).then((latest) => {
-      if (cancelled) return
-      setMaxPeriod(latest)
-      setPeriod(latest)
+      if (!cancelled) setPeriod(latest)
     })
     return () => { cancelled = true }
-  }, [theme, session.server])
+  }, [theme, session.server, period, setPeriod])
 
   const collectionName = useMemo(
     () => period > 0 ? getCollectionName(theme, period, session.server) : '',
@@ -206,7 +213,7 @@ function MapApp({ session, locale, onLocaleChange, onLogout }: MapAppProps) {
           <label className="toolbar-label">
             {t(locale, 'period')}
             <select value={period} onChange={(e) => setPeriod(Number(e.target.value))}>
-              {Array.from({ length: maxPeriod }, (_, i) => i + 1).map((p) => (
+              {Array.from({ length: MAX_PERIODS }, (_, i) => i + 1).map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>

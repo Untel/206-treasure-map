@@ -8,13 +8,12 @@ import {
   type SuggestedZone,
 } from '../types/map'
 
-const SUGGESTION_STEP = 5
+const SUGGESTION_STEP = 10
 const TOP_SUGGESTION_COUNT = 5
 const MIN_X = 0
 const MAX_X = MAP_WIDTH - 1
 const MIN_Y = 0
 const MAX_Y = MAP_HEIGHT - 1
-const PROMISING_AREA_MIN_DISTANCE = ZONE_SIZE * 3
 
 export function clampXCoordinate(value: number) {
   return Math.min(MAX_X, Math.max(MIN_X, Math.round(value)))
@@ -51,161 +50,111 @@ export function isPlacementValid(
   return positions.every((position) => !zonesOverlap(candidate, position))
 }
 
-function nearestPositionDistance(
-  candidate: Pick<PositionRecord, 'x' | 'y'>,
-  positions: Array<Pick<PositionRecord, 'x' | 'y'>>,
-) {
-  if (positions.length === 0) {
-    return Math.hypot(MAP_WIDTH, MAP_HEIGHT)
-  }
-
-  return Math.min(
-    ...positions.map((position) =>
-      Math.hypot(candidate.x - position.x, candidate.y - position.y),
-    ),
-  )
-}
-
-function nearestConstraintDistance(
-  candidate: Pick<PositionRecord, 'x' | 'y'>,
-  positions: Array<Pick<PositionRecord, 'x' | 'y'>>,
-) {
-  return nearestPositionDistance(candidate, positions)
-}
-
-function buildPromisingWindow(zone: SuggestedZone, index: number): PromisingArea {
-  const bounds = zoneBounds(zone.x, zone.y)
-  return {
-    id: `window-${zone.x}-${zone.y}-${index}`,
-    left: bounds.left,
-    top: bounds.top,
-    right: bounds.right,
-    bottom: bounds.bottom,
-    area: zone.area,
-  }
-}
-
-function analyzePromisingAreas(positions: PositionRecord[]) {
-  const columns = Math.floor((MAX_X - MIN_X) / SUGGESTION_STEP) + 1
+/**
+ * Farthest-point sampling: iteratively pick the valid cell whose minimum
+ * distance to all occupied + already-picked points is the largest.
+ * This naturally spreads suggestions across the biggest gaps on the map.
+ */
+function farthestPointSuggestions(positions: PositionRecord[]) {
+  const cols = Math.floor((MAX_X - MIN_X) / SUGGESTION_STEP) + 1
   const rows = Math.floor((MAX_Y - MIN_Y) / SUGGESTION_STEP) + 1
-  const validCells: boolean[][] = Array.from({ length: rows }, () => Array<boolean>(columns).fill(false))
 
-  for (let row = 0; row < rows; row += 1) {
-    const y = MIN_Y + row * SUGGESTION_STEP
-    for (let column = 0; column < columns; column += 1) {
-      const x = MIN_X + column * SUGGESTION_STEP
-      validCells[row][column] = isPlacementValid({ x, y }, positions)
+  // Pre-compute which grid cells are valid placements
+  const valid: boolean[] = new Array(rows * cols)
+  for (let r = 0; r < rows; r++) {
+    const y = MIN_Y + r * SUGGESTION_STEP
+    for (let c = 0; c < cols; c++) {
+      valid[r * cols + c] = isPlacementValid(
+        { x: MIN_X + c * SUGGESTION_STEP, y },
+        positions,
+      )
     }
   }
 
-  const visited: boolean[][] = Array.from({ length: rows }, () => Array<boolean>(columns).fill(false))
-  const directions = [
-    [1, 0],
-    [-1, 0],
-    [0, 1],
-    [0, -1],
-  ] as const
-  const candidates: SuggestedZone[] = []
+  // minDist[i] = min distance from cell i to any occupied or picked point
+  // Seed with distance to nearest border so edges don't dominate
+  const minDist = new Float32Array(rows * cols)
+  for (let r = 0; r < rows; r++) {
+    const y = MIN_Y + r * SUGGESTION_STEP
+    const borderY = Math.min(y - MIN_Y, MAX_Y - y)
+    for (let c = 0; c < cols; c++) {
+      const x = MIN_X + c * SUGGESTION_STEP
+      const borderX = Math.min(x - MIN_X, MAX_X - x)
+      minDist[r * cols + c] = Math.min(borderX, borderY)
+    }
+  }
 
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      if (!validCells[row][column] || visited[row][column]) {
-        continue
-      }
-
-      const queue: Array<[number, number]> = [[row, column]]
-      const component: Array<[number, number]> = []
-      visited[row][column] = true
-      let minRow = row
-      let maxRow = row
-      let minColumn = column
-      let maxColumn = column
-
-      while (queue.length > 0) {
-        const current = queue.shift()!
-        component.push(current)
-        minRow = Math.min(minRow, current[0])
-        maxRow = Math.max(maxRow, current[0])
-        minColumn = Math.min(minColumn, current[1])
-        maxColumn = Math.max(maxColumn, current[1])
-
-        for (const [rowOffset, columnOffset] of directions) {
-          const nextRow = current[0] + rowOffset
-          const nextColumn = current[1] + columnOffset
-
-          if (
-            nextRow < 0 ||
-            nextRow >= rows ||
-            nextColumn < 0 ||
-            nextColumn >= columns ||
-            visited[nextRow][nextColumn] ||
-            !validCells[nextRow][nextColumn]
-          ) {
-            continue
-          }
-
-          visited[nextRow][nextColumn] = true
-          queue.push([nextRow, nextColumn])
-        }
-      }
-
-      const componentArea = component.length * SUGGESTION_STEP * SUGGESTION_STEP
-      for (const [componentRow, componentColumn] of component) {
-        const candidate = {
-          x: MIN_X + componentColumn * SUGGESTION_STEP,
-          y: MIN_Y + componentRow * SUGGESTION_STEP,
-        }
-        const clearance = nearestConstraintDistance(candidate, positions)
-        const score = componentArea * 0.3 + clearance * 3
-
-        candidates.push({ ...candidate, score, clearance, area: componentArea })
+  // Update with distances from existing positions
+  for (const pos of positions) {
+    for (let r = 0; r < rows; r++) {
+      const y = MIN_Y + r * SUGGESTION_STEP
+      const dy = y - pos.y
+      for (let c = 0; c < cols; c++) {
+        const x = MIN_X + c * SUGGESTION_STEP
+        const dx = x - pos.x
+        const d = Math.sqrt(dx * dx + dy * dy)
+        const idx = r * cols + c
+        if (d < minDist[idx]) minDist[idx] = d
       }
     }
   }
 
-  if (candidates.length === 0) {
-    return { best: null, areas: [] as PromisingArea[] }
+  const picked: SuggestedZone[] = []
+
+  for (let n = 0; n < TOP_SUGGESTION_COUNT; n++) {
+    // Find the valid cell with largest minDist
+    let bestIdx = -1
+    let bestDist = -Infinity
+    for (let i = 0; i < rows * cols; i++) {
+      if (valid[i] && minDist[i] > bestDist) {
+        bestDist = minDist[i]
+        bestIdx = i
+      }
+    }
+    if (bestIdx < 0) break
+
+    const r = Math.floor(bestIdx / cols)
+    const c = bestIdx % cols
+    const px = MIN_X + c * SUGGESTION_STEP
+    const py = MIN_Y + r * SUGGESTION_STEP
+
+    picked.push({ x: px, y: py, score: bestDist, clearance: bestDist, area: 0 })
+
+    // Update minDist with the newly picked point
+    for (let ri = 0; ri < rows; ri++) {
+      const y = MIN_Y + ri * SUGGESTION_STEP
+      const dy = y - py
+      for (let ci = 0; ci < cols; ci++) {
+        const x = MIN_X + ci * SUGGESTION_STEP
+        const dx = x - px
+        const d = Math.sqrt(dx * dx + dy * dy)
+        const idx = ri * cols + ci
+        if (d < minDist[idx]) minDist[idx] = d
+      }
+    }
   }
 
-  candidates.sort((left, right) => {
-    if (right.score !== left.score) {
-      return right.score - left.score
+  const areas: PromisingArea[] = picked.map((zone, i) => {
+    const bounds = zoneBounds(zone.x, zone.y)
+    return {
+      id: `suggest-${i}`,
+      left: bounds.left,
+      top: bounds.top,
+      right: bounds.right,
+      bottom: bounds.bottom,
+      area: 0,
     }
-
-    if (right.clearance !== left.clearance) {
-      return right.clearance - left.clearance
-    }
-
-    return right.area - left.area
   })
 
-  const topZones: SuggestedZone[] = []
-  for (const candidate of candidates) {
-    const farEnough = topZones.every(
-      (zone) => Math.hypot(zone.x - candidate.x, zone.y - candidate.y) >= PROMISING_AREA_MIN_DISTANCE,
-    )
-    if (farEnough) {
-      topZones.push(candidate)
-    }
-    if (topZones.length === TOP_SUGGESTION_COUNT) {
-      break
-    }
-  }
-
-  const best = topZones[0] ?? candidates[0] ?? null
-  const seedZones =
-    topZones.length > 0 ? topZones : candidates.slice(0, TOP_SUGGESTION_COUNT)
-  const areas = seedZones.map((zone, index) => buildPromisingWindow(zone, index))
-
-  return { best, areas }
+  return { best: picked[0] ?? null, areas }
 }
 
 export function suggestNextZone(positions: PositionRecord[]): SuggestedZone | null {
-  return analyzePromisingAreas(positions).best
+  return farthestPointSuggestions(positions).best
 }
 
 export function getPromisingAreas(positions: PositionRecord[]): PromisingArea[] {
-  return analyzePromisingAreas(positions).areas
+  return farthestPointSuggestions(positions).areas
 }
 
 export function coveragePercentage(positions: PositionRecord[]) {
